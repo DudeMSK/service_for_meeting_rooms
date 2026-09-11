@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'" />
+    <title>Переговорные</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v11a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 17V6A1.5 1.5 0 0 1 5 4.5Z"/><path d="M8 2.8v3.4M16 2.8v3.4M3.5 8.5h17"/></svg>
+          </div>
+          <div>
+            <div class="brand-name">Переговорные</div>
+            <div class="brand-caption">Exchange · EWS</div>
+          </div>
+        </div>
+
+        <div class="sidebar-scroll">
+          <div class="sidebar-section-title">
+            <span>Переговорные комнаты</span>
+            <span class="room-count" id="roomCount">0</span>
+          </div>
+          <div class="room-list" id="roomList"></div>
+
+          <div class="sidebar-section-title online-title">
+            <span>Онлайн встречи</span>
+            <span class="room-count" id="onlineCount">0</span>
+          </div>
+          <div class="room-list online-list" id="onlineList"></div>
+        </div>
+
+        <div class="sidebar-bottom">
+          <div class="sync-state" id="syncState">
+            <span class="sync-dot"></span>
+            <div><strong>Ожидание синхронизации</strong><small>Exchange не опрошен</small></div>
+          </div>
+          <button class="icon-text-button" id="settingsButton" type="button">
+            <svg viewBox="0 0 24 24"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.37a1.7 1.7 0 0 0-1 .63 1.7 1.7 0 0 0-.4 1.1V21H9.6v-.1A1.7 1.7 0 0 0 8.5 19.3a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.13 15a1.7 1.7 0 0 0-.63-1 1.7 1.7 0 0 0-1.1-.4H2.3V9.6h.1A1.7 1.7 0 0 0 4 8.5a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8.4 4.13a1.7 1.7 0 0 0 1-.63 1.7 1.7 0 0 0 .4-1.1v-.1h4v.1A1.7 1.7 0 0 0 14.9 4a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06a1.7 1.7 0 0 0-.34 1.9c.16.4.38.73.63 1 .3.26.7.4 1.1.4h.1v4H21a1.7 1.7 0 0 0-1.6 1.2Z"/></svg>
+            Настройки
+          </button>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div class="date-navigation">
+            <button class="nav-button" id="prevButton" type="button" aria-label="Предыдущий период">
+              <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <button class="today-button" id="todayButton" type="button">Сегодня</button>
+            <button class="nav-button" id="nextButton" type="button" aria-label="Следующий период">
+              <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+            <h1 id="periodTitle">Сегодня</h1>
+          </div>
+          <div class="topbar-actions">
+            <div class="view-switcher" role="tablist" aria-label="Масштаб календаря">
+              <button class="view-button active" data-view="day" type="button">День</button>
+              <button class="view-button" data-view="week" type="button">Неделя</button>
+              <button class="view-button" data-view="month" type="button">Месяц</button>
+            </div>
+            <button class="refresh-button" id="refreshButton" type="button" aria-label="Обновить">
+              <svg viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5"/><path d="M18.5 9a7 7 0 0 0-11.7-2.6L4 11M6 15a7 7 0 0 0 11.7 2.6L20 13"/></svg>
+            </button>
+          </div>
+        </header>
+
+        <section class="room-summary" id="roomSummary"></section>
+        <section class="calendar-wrap" id="calendar" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <div class="toast-region" id="toastRegion" aria-live="polite"></div>
+
+    <dialog class="modal settings-modal" id="settingsDialog">
+      <form method="dialog" id="settingsForm">
+        <div class="modal-header">
+          <div><h2>Настройки календаря</h2></div>
+          <button class="close-button" value="cancel" type="submit" aria-label="Закрыть">×</button>
+        </div>
+        <div class="settings-tabs" role="tablist" aria-label="Разделы настроек">
+          <button class="settings-tab active" data-tab="general" type="button" role="tab" aria-selected="true">Общие</button>
+          <button class="settings-tab" data-tab="appearance" type="button" role="tab" aria-selected="false">Внешний вид</button>
+        </div>
+        <div class="settings-tab-panel" data-tab-panel="general">
+          <div class="form-grid">
+            <label class="wide"><span>Календари для чтения</span><div class="information-field" id="mailboxesInfo"></div><small>Список задан системно и доступен только для просмотра.</small></label>
+            <label><span>Часовой пояс</span><input name="timeZone" value="Europe/Moscow" required /></label>
+            <label><span>Обновление, минут</span><input name="refreshMinutes" type="number" min="1" max="60" value="5" required /></label>
+          </div>
+          <div class="test-result" id="testResult" hidden></div>
+          <div class="tab-panel-actions">
+            <button class="secondary-button" id="testButton" type="button">Проверить подключение</button>
+          </div>
+          <div class="update-row">
+            <div>
+              <span class="update-version">Версия приложения: <strong id="appVersionLabel">—</strong></span>
+              <small class="update-status" id="updateStatus"></small>
+            </div>
+            <button class="secondary-button" id="updateButton" type="button">Проверить обновления</button>
+          </div>
+        </div>
+        <div class="settings-tab-panel" data-tab-panel="appearance" hidden>
+          <p class="tab-panel-description">Календарь и панель переговорных комнат настраиваются отдельно.</p>
+          <div class="form-grid">
+            <label><span>Календарь — тема</span><select name="mainTheme"><option value="system">Как в Windows</option><option value="light">Светлая</option><option value="dark">Темная</option></select></label>
+            <label><span>Календарь — цвет</span><select name="mainAccent"><option value="green">Зеленый</option><option value="blue">Синий</option><option value="violet">Фиолетовый</option><option value="orange">Оранжевый</option></select></label>
+            <label><span>Панель переговорных комнат — тема</span><select name="sidebarTheme"><option value="match-main">Как календарь</option><option value="dark">Темная</option><option value="light">Светлая</option></select></label>
+            <label><span>Панель переговорных комнат — цвет</span><select name="sidebarAccent"><option value="green">Зеленый</option><option value="blue">Синий</option><option value="violet">Фиолетовый</option><option value="orange">Оранжевый</option></select></label>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <div class="actions-spacer"></div>
+          <button class="secondary-button" value="cancel" type="submit">Отмена</button>
+          <button class="primary-button" id="saveButton" type="button">Сохранить</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="modal event-modal" id="eventDialog">
+      <div id="eventDetails"></div>
+    </dialog>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

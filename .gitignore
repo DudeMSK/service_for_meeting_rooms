@@ -1,0 +1,12 @@
+node_modules/
+release/
+dist/
+.env
+.env.*.local
+*.log
+.DS_Store
+Thumbs.db
+/ERS_MEETING_ROOM.exe
+/ERS_MEETING_ROOM_INSTALLER.exe
+.claude/
+
