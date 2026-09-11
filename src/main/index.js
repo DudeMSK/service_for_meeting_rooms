@@ -81,6 +81,7 @@ function createWindow() {
     backgroundColor: useDarkBackground ? '#111714' : '#f5f6f3',
     show: false,
     title: 'Переговорные',
+    icon: path.join(__dirname, '..', '..', 'assets', 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload.js'),
       contextIsolation: true,
