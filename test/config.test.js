@@ -141,3 +141,36 @@ test('update token from .env round-trips through encrypted storage and is never 
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('GH_TOKEN from .env is picked up even when settings.json already exists without a saved update token', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'meeting-room-config-'));
+  const appPath = path.join(root, 'app');
+  const userDataPath = path.join(root, 'user-data');
+  fs.mkdirSync(appPath);
+  fs.mkdirSync(userDataPath);
+  // Simulates a machine that was set up (settings.json saved) before GH_TOKEN existed.
+  fs.writeFileSync(
+    path.join(userDataPath, 'settings.json'),
+    JSON.stringify({
+      email: 'service@example.org',
+      username: 'DOMAIN\\service',
+      passwordEncrypted: Buffer.from('test-secret', 'utf8').toString('base64'),
+      server: 'mail.example.org',
+      mailboxes: ['one@example.org'],
+      refreshMinutes: 10,
+      timeZone: 'Europe/Moscow',
+    })
+  );
+  fs.writeFileSync(path.join(appPath, '.env'), 'GH_TOKEN=added-later-token\n');
+  const safeStorage = {
+    isEncryptionAvailable: () => true,
+    encryptString: (value) => Buffer.from(value, 'utf8'),
+    decryptString: (value) => value.toString('utf8'),
+  };
+  try {
+    const store = new ConfigStore({ appPath, userDataPath, safeStorage });
+    assert.equal(store.load().updateToken, 'added-later-token');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

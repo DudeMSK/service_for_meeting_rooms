@@ -104,7 +104,10 @@ function registerIpc() {
     if (!hasToken) {
       throw new Error('Автообновление не настроено: добавьте токен GitHub (GH_TOKEN) в .env.');
     }
-    await autoUpdater.checkForUpdates();
+    const result = await autoUpdater.checkForUpdates();
+    if (!result) {
+      sendUpdateStatus({ type: 'not-packaged' });
+    }
   });
 
   ipcMain.handle('update:download', async () => {

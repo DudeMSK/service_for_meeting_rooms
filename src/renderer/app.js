@@ -528,6 +528,11 @@ function handleUpdateStatus(status) {
     elements.updateButton.disabled = false;
     elements.updateButton.textContent = 'Проверить обновления';
     setUpdateStatus(cleanError(status.message), 'error');
+  } else if (status.type === 'not-packaged') {
+    state.updateMode = 'idle';
+    elements.updateButton.disabled = false;
+    elements.updateButton.textContent = 'Проверить обновления';
+    setUpdateStatus('Проверка обновлений недоступна в режиме разработки (npm start) — работает только в установленном приложении.');
   }
 }
 

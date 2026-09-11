@@ -99,11 +99,11 @@ class ConfigStore {
       if (stored.passwordEncrypted && this.safeStorage.isEncryptionAvailable()) {
         password = this.safeStorage.decryptString(Buffer.from(stored.passwordEncrypted, 'base64'));
       }
-      let updateToken = '';
+      const result = { ...stored, password };
       if (stored.updateTokenEncrypted && this.safeStorage.isEncryptionAvailable()) {
-        updateToken = this.safeStorage.decryptString(Buffer.from(stored.updateTokenEncrypted, 'base64'));
+        result.updateToken = this.safeStorage.decryptString(Buffer.from(stored.updateTokenEncrypted, 'base64'));
       }
-      return { ...stored, password, updateToken };
+      return result;
     } catch {
       return {};
     }
