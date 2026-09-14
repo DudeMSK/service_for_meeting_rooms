@@ -353,7 +353,9 @@ function renderDay(room) {
     const lane = overlapping ? previousOverlapCount % 2 : 0;
     const horizontal = overlapping ? (lane === 0 ? 'left:12px;right:50.5%;' : 'left:50.5%;right:12px;') : 'left:12px;right:12px;';
     const key = registerEvent(room, event);
-    return `<button class="event-block ${event.freeBusy === 'tentative' ? 'tentative' : ''} ${room.source === 'online' ? 'online' : ''}" data-event-key="${key}" type="button" style="top:${top}px;height:${height}px;${horizontal}"><strong>${escapeHtml(event.subject)}</strong><span>${formatTime(event.start)}–${formatTime(event.end)}${event.organizer ? ` · ${escapeHtml(event.organizer)}` : ''}</span></button>`;
+    const compact = height < 40;
+    const timeLabel = `${formatTime(event.start)}–${formatTime(event.end)}${event.organizer ? ` · ${escapeHtml(event.organizer)}` : ''}`;
+    return `<button class="event-block ${compact ? 'compact' : ''} ${event.freeBusy === 'tentative' ? 'tentative' : ''} ${room.source === 'online' ? 'online' : ''}" data-event-key="${key}" type="button" style="top:${top}px;height:${height}px;${horizontal}"><strong>${escapeHtml(event.subject)}</strong><span>${timeLabel}</span></button>`;
   }).join('');
   const hours = Array.from({ length: endHour - startHour + 1 }, (_, index) => {
     const hour = startHour + index;

@@ -82,7 +82,7 @@ function createWindow() {
     minHeight: 680,
     backgroundColor: useDarkBackground ? '#111714' : '#f5f6f3',
     show: false,
-    title: 'Переговорные',
+    title: 'ЭРС групп | просмотр занятости переговорных',
     icon: path.join(__dirname, '..', '..', 'assets', 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload.js'),

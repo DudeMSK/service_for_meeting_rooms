@@ -141,11 +141,11 @@ html[data-sidebar-theme="light"] .sidebar {
   --sidebar-neutral-dot: #909c98;
   --sidebar-busy-text: #b94f4b;
 }
-.brand { height: 86px; display: flex; align-items: center; gap: 12px; padding: 0 22px; border-bottom: 1px solid var(--sidebar-border); }
-.brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; color: var(--sidebar-accent); background: color-mix(in srgb, var(--sidebar-accent) 14%, transparent); border: 1px solid color-mix(in srgb, var(--sidebar-accent) 28%, transparent); }
+.brand { min-height: 86px; display: flex; align-items: center; gap: 12px; padding: 14px 22px; border-bottom: 1px solid var(--sidebar-border); }
+.brand-mark { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; color: var(--sidebar-accent); background: color-mix(in srgb, var(--sidebar-accent) 14%, transparent); border: 1px solid color-mix(in srgb, var(--sidebar-accent) 28%, transparent); }
 .brand-mark svg { width: 23px; height: 23px; }
 .brand-name { font-size: 16px; font-weight: 680; letter-spacing: .01em; }
-.brand-caption { color: var(--sidebar-muted); font-size: 11px; margin-top: 2px; text-transform: uppercase; letter-spacing: .12em; }
+.brand-caption { margin-top: 2px; color: var(--sidebar-muted); font-size: 11.5px; line-height: 1.4; letter-spacing: .01em; }
 .sidebar-section-title { padding: 24px 22px 12px; display: flex; align-items: center; justify-content: space-between; color: var(--sidebar-muted); font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: .12em; }
 .sidebar-scroll { flex: 1; min-height: 0; overflow-y: auto; }
 .sidebar-section-title.online-title { padding-top: 18px; border-top: 1px solid var(--sidebar-subtle-border); }
@@ -239,6 +239,9 @@ html[data-sidebar-theme="light"] .sidebar {
 .event-block strong, .event-block span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .event-block strong { font-size: 12px; font-weight: 650; }
 .event-block span { margin-top: 3px; color: var(--muted); font-size: 11px; }
+.event-block.compact { display: flex; align-items: center; padding: 0 10px 0 12px; }
+.event-block.compact strong { flex: 1 1 auto; min-width: 30px; font-size: 11px; }
+.event-block.compact span { flex: 0 1 auto; max-width: 55%; margin-top: 0; margin-left: 6px; }
 .now-line { position: absolute; left: 0; right: 0; z-index: 4; border-top: 1px solid var(--red); pointer-events: none; }
 .now-line::before { content: ""; position: absolute; left: -4px; top: -4px; width: 7px; height: 7px; border-radius: 50%; background: var(--red); }
 
