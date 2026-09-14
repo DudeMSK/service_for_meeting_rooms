@@ -1,6 +1,6 @@
 {
   "name": "meeting-room-calendar",
-  "version": "1.4.2",
+  "version": "1.5.1",
   "description": "Десктопное приложение для просмотра занятости переговорных комнат из Exchange (EWS)",
   "main": "src/main/index.js",
   "author": "Enremservice",
@@ -54,7 +54,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "shortcutName": "ERS_MEETING_ROOM",
-      "artifactName": "ERS_MEETING_ROOM_INSTALLER.${ext}"
+      "artifactName": "ERS_MEETING_ROOM_INSTALLER.${ext}",
+      "include": "build/installer.nsh"
     },
     "publish": {
       "provider": "github",

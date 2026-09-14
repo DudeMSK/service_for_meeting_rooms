@@ -1,8 +1,9 @@
 using System;
 using System.Diagnostics;
 
-// Настоящий Windows-исполняемый файл (EXE), заменяющий BUILD_INSTALLER.cmd.
-// Прогоняет проверки и собирает NSIS-установщик (release\ERS_MEETING_ROOM_INSTALLER.exe).
+// Настоящий Windows-исполняемый файл (EXE) для разработчика — прогоняет проверки
+// и собирает NSIS-установщик (release\ERS_MEETING_ROOM_INSTALLER.exe).
+// Это НЕ установщик приложения — не путать с файлом в release\.
 class Program
 {
     static int Main()

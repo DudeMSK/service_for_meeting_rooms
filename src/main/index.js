@@ -5,7 +5,9 @@ const path = require('node:path');
 const { ConfigStore, normalizeSettings, validateSettings } = require('./config');
 const { EwsCalendarClient } = require('./ews-client');
 const { readConfiguredRooms } = require('./rooms');
-const pkg = require('../../package.json');
+
+const UPDATE_REPO_OWNER = 'DudeMSK';
+const UPDATE_REPO_NAME = 'service_for_meeting_rooms';
 
 let mainWindow;
 let configStore;
@@ -49,8 +51,8 @@ function configureAutoUpdater() {
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.setFeedURL({
     provider: 'github',
-    owner: pkg.build.publish.owner,
-    repo: pkg.build.publish.repo,
+    owner: UPDATE_REPO_OWNER,
+    repo: UPDATE_REPO_NAME,
     private: true,
     token: config.updateToken || undefined,
   });
