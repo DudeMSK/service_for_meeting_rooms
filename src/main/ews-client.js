@@ -69,6 +69,8 @@ function safeError(error, config) {
   if (/403|forbidden|access.*denied/i.test(message)) return 'Нет права на чтение этого календаря (HTTP 403).';
   if (/404|not found/i.test(message)) return 'EWS не найден. Проверьте сервер и путь /EWS/Exchange.asmx.';
   if (/certificate|self.?signed|unable to verify/i.test(message)) return 'Не удалось проверить TLS-сертификат EWS-сервера.';
+  if (/reading 'headers'/i.test(message)) return 'Нет соединения с сервером Exchange: сервер не ответил на запрос авторизации NTLM. Проверьте сеть/VPN и адрес сервера, затем повторите попытку.';
+  if (/ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|network.?error/i.test(message)) return 'Нет соединения с сервером Exchange. Проверьте сеть/VPN и адрес сервера.';
   return message.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 420);
 }
 
@@ -145,4 +147,5 @@ module.exports = {
   deduplicateEvents,
   ewsDateToIso,
   serializeAppointment,
+  safeError,
 };

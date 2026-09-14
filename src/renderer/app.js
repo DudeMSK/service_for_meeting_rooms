@@ -215,7 +215,7 @@ function renderRoomList() {
         detail = `Занята до ${formatTime(active.end)}`;
         status = 'busy';
       } else if (showsNow) {
-        detail = upcoming ? `Свободна · далее в ${formatTime(upcoming.start)}` : 'Свободна до конца периода';
+        detail = upcoming ? `Свободна | Ближайшая в ${formatTime(upcoming.start)}` : 'Свободна до конца периода';
         status = '';
       }
       return `<button class="room-item ${room.id === state.selectedRoomId ? 'active' : ''}" data-room-id="${escapeHtml(room.id)}" type="button">
