@@ -8,6 +8,8 @@ const { readConfiguredRooms } = require('./rooms');
 
 const UPDATE_REPO_OWNER = 'DudeMSK';
 const UPDATE_REPO_NAME = 'service_for_meeting_rooms';
+const UPDATE_CHECK_STARTUP_DELAY_MS = 20_000;
+const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 
 let mainWindow;
 let configStore;
@@ -61,6 +63,22 @@ function configureAutoUpdater() {
 
 function sendUpdateStatus(status) {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update:status', status);
+}
+
+async function checkForUpdatesInBackground() {
+  const hasToken = configureAutoUpdater();
+  if (!hasToken) return;
+  try {
+    await autoUpdater.checkForUpdates();
+  } catch {
+    // Surfaced to the renderer via the autoUpdater 'error' event handled in registerAutoUpdaterEvents();
+    // swallowed here only to avoid an unhandled promise rejection for this unattended background check.
+  }
+}
+
+function scheduleAutoUpdateChecks() {
+  setTimeout(checkForUpdatesInBackground, UPDATE_CHECK_STARTUP_DELAY_MS);
+  setInterval(checkForUpdatesInBackground, UPDATE_CHECK_INTERVAL_MS);
 }
 
 function registerAutoUpdaterEvents() {
@@ -153,6 +171,7 @@ app.whenReady().then(() => {
   registerIpc();
   registerAutoUpdaterEvents();
   createWindow();
+  scheduleAutoUpdateChecks();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

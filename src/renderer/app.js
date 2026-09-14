@@ -19,6 +19,16 @@ const elements = {
   appVersionLabel: document.querySelector('#appVersionLabel'),
   updateStatus: document.querySelector('#updateStatus'),
   updateButton: document.querySelector('#updateButton'),
+  updateAlertButton: document.querySelector('#updateAlertButton'),
+  updateDialog: document.querySelector('#updateDialog'),
+  updateDialogClose: document.querySelector('#updateDialogClose'),
+  updateModalIcon: document.querySelector('#updateModalIcon'),
+  updateModalTitle: document.querySelector('#updateModalTitle'),
+  updateModalDetail: document.querySelector('#updateModalDetail'),
+  updateProgressFill: document.querySelector('#updateProgressFill'),
+  updateModalActions: document.querySelector('#updateModalActions'),
+  updateLaterButton: document.querySelector('#updateLaterButton'),
+  updateRestartButton: document.querySelector('#updateRestartButton'),
   eventDialog: document.querySelector('#eventDialog'),
   eventDetails: document.querySelector('#eventDetails'),
   toastRegion: document.querySelector('#toastRegion'),
@@ -34,6 +44,9 @@ const state = {
   loading: false,
   refreshTimer: null,
   updateMode: 'idle',
+  updateVersion: '',
+  updatePercent: 0,
+  updateErrorMessage: '',
 };
 
 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
@@ -44,6 +57,11 @@ const icons = {
   calendar: '<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M8 3v4M16 3v4M3.5 9h17"/></svg>',
   warning: '<svg viewBox="0 0 24 24"><path d="M10.3 4.2 2.7 17.4A1.8 1.8 0 0 0 4.3 20h15.4a1.8 1.8 0 0 0 1.6-2.6L13.7 4.2a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 16.5h.01"/></svg>',
   video: '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg>',
+};
+
+const updateIcons = {
+  download: '<svg viewBox="0 0 24 24"><path d="M12 4v10m0 0-3.5-3.5M12 14l3.5-3.5"/><path d="M5 18h14"/></svg>',
+  ready: '<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 4v4h-4M6 20v-4h4"/></svg>',
 };
 
 function escapeHtml(value) {
@@ -512,21 +530,25 @@ function handleUpdateStatus(status) {
     setUpdateStatus('У вас установлена последняя версия.');
   } else if (status.type === 'available') {
     state.updateMode = 'available';
+    state.updateVersion = status.version;
     elements.updateButton.disabled = false;
     elements.updateButton.textContent = 'Скачать и установить';
     setUpdateStatus(`Доступна версия ${status.version}.`, 'available');
   } else if (status.type === 'progress') {
     state.updateMode = 'downloading';
+    state.updatePercent = status.percent;
     elements.updateButton.disabled = true;
     elements.updateButton.textContent = `Скачивание… ${status.percent}%`;
     setUpdateStatus(`Скачивание обновления: ${status.percent}%.`);
   } else if (status.type === 'downloaded') {
     state.updateMode = 'downloaded';
+    state.updateVersion = status.version;
     elements.updateButton.disabled = false;
     elements.updateButton.textContent = 'Перезапустить и установить';
     setUpdateStatus(`Версия ${status.version} готова к установке.`, 'available');
   } else if (status.type === 'error') {
     state.updateMode = 'idle';
+    state.updateErrorMessage = cleanError(status.message);
     elements.updateButton.disabled = false;
     elements.updateButton.textContent = 'Проверить обновления';
     setUpdateStatus(cleanError(status.message), 'error');
@@ -535,6 +557,64 @@ function handleUpdateStatus(status) {
     elements.updateButton.disabled = false;
     elements.updateButton.textContent = 'Проверить обновления';
     setUpdateStatus('Проверка обновлений недоступна в режиме разработки (npm start) — работает только в установленном приложении.');
+  }
+  syncUpdateAlertButton();
+  if (elements.updateDialog.open) renderUpdateModal();
+}
+
+function syncUpdateAlertButton() {
+  const visible = ['available', 'downloading', 'downloaded'].includes(state.updateMode);
+  elements.updateAlertButton.hidden = !visible;
+  elements.updateAlertButton.classList.toggle('downloading', state.updateMode === 'downloading');
+  elements.updateAlertButton.innerHTML = state.updateMode === 'downloaded' ? updateIcons.ready : updateIcons.download;
+  elements.updateAlertButton.title = state.updateMode === 'downloaded'
+    ? `Версия ${state.updateVersion} готова к установке — нажмите, чтобы перезапустить`
+    : state.updateMode === 'downloading'
+      ? `Скачивание обновления… ${state.updatePercent}%`
+      : `Доступна версия ${state.updateVersion}`;
+}
+
+function renderUpdateModal() {
+  const mode = state.updateMode;
+  if (mode === 'downloading') {
+    elements.updateModalIcon.innerHTML = updateIcons.download;
+    elements.updateModalTitle.textContent = state.updateVersion ? `Скачивание версии ${state.updateVersion}` : 'Скачивание обновления';
+    elements.updateModalDetail.textContent = `${state.updatePercent}%`;
+    elements.updateProgressFill.style.width = `${state.updatePercent}%`;
+    elements.updateModalActions.hidden = true;
+  } else if (mode === 'downloaded') {
+    elements.updateModalIcon.innerHTML = updateIcons.ready;
+    elements.updateModalTitle.textContent = `Версия ${state.updateVersion} готова к установке`;
+    elements.updateModalDetail.textContent = 'Установите сейчас или при следующем закрытии приложения.';
+    elements.updateProgressFill.style.width = '100%';
+    elements.updateModalActions.hidden = false;
+  } else if (mode === 'available') {
+    elements.updateModalIcon.innerHTML = updateIcons.download;
+    elements.updateModalTitle.textContent = `Начинаю скачивание версии ${state.updateVersion}`;
+    elements.updateModalDetail.textContent = 'Подготовка…';
+    elements.updateProgressFill.style.width = '0%';
+    elements.updateModalActions.hidden = true;
+  } else {
+    elements.updateModalIcon.innerHTML = updateIcons.download;
+    elements.updateModalTitle.textContent = state.updateErrorMessage ? 'Не удалось скачать обновление' : 'Обновление недоступно';
+    elements.updateModalDetail.textContent = state.updateErrorMessage || '';
+    elements.updateProgressFill.style.width = '0%';
+    elements.updateModalActions.hidden = true;
+  }
+}
+
+async function openUpdateDialog() {
+  if (!elements.updateDialog.open) elements.updateDialog.showModal();
+  renderUpdateModal();
+  if (state.updateMode === 'available') {
+    try {
+      await api.downloadUpdate();
+    } catch (error) {
+      state.updateMode = 'idle';
+      state.updateErrorMessage = cleanError(error);
+      syncUpdateAlertButton();
+      renderUpdateModal();
+    }
   }
 }
 
@@ -659,6 +739,20 @@ document.querySelectorAll('.settings-tab').forEach((button) => {
 });
 elements.updateButton.addEventListener('click', handleUpdateButtonClick);
 api.onUpdateStatus(handleUpdateStatus);
+
+elements.updateAlertButton.addEventListener('click', openUpdateDialog);
+elements.updateDialogClose.addEventListener('click', () => elements.updateDialog.close());
+elements.updateDialog.addEventListener('click', (event) => {
+  if (event.target === elements.updateDialog) elements.updateDialog.close();
+});
+elements.updateLaterButton.addEventListener('click', () => elements.updateDialog.close());
+elements.updateRestartButton.addEventListener('click', async () => {
+  try {
+    await api.installUpdate();
+  } catch {
+    // The app quits as part of a successful install; a rejected/unsettled promise here is expected noise.
+  }
+});
 
 document.querySelectorAll('.view-button').forEach((button) => button.addEventListener('click', () => {
   if (state.view === button.dataset.view) return;
