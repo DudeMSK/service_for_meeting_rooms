@@ -9,12 +9,14 @@ Var EwsUsernameField
 Var EwsPasswordField
 Var EwsServerField
 Var EwsMailboxesField
+Var EwsTokenField
 
 Var EwsEmailValue
 Var EwsUsernameValue
 Var EwsPasswordValue
 Var EwsServerValue
 Var EwsMailboxesValue
+Var EwsTokenValue
 Var EwsPageShown
 
 ; Function definitions live INSIDE this macro on purpose: the macro body is only pasted
@@ -71,6 +73,11 @@ Var EwsPageShown
     ${NSD_CreateText} 0 73u 100% 12u ""
     Pop $EwsMailboxesField
 
+    ${NSD_CreateLabel} 0 89u 100% 8u "Токен GitHub для автообновления (необязательно)"
+    Pop $0
+    ${NSD_CreatePassword} 0 98u 100% 12u ""
+    Pop $EwsTokenField
+
     StrCpy $EwsPageShown "1"
     nsDialogs::Show
   FunctionEnd
@@ -81,23 +88,36 @@ Var EwsPageShown
     ${NSD_GetText} $EwsPasswordField $EwsPasswordValue
     ${NSD_GetText} $EwsServerField $EwsServerValue
     ${NSD_GetText} $EwsMailboxesField $EwsMailboxesValue
+    ${NSD_GetText} $EwsTokenField $EwsTokenValue
   FunctionEnd
 !macroend
 
 !macro customInstall
-  ; Only write .env if our page was actually shown and filled in — guards against any
-  ; edge case where Leave might run without a real dialog (e.g. nsDialogs::Create failure).
+  ; Only write .env if our page was actually shown — guards against any edge case where
+  ; Leave might run without a real dialog (e.g. nsDialogs::Create failure).
   ${If} $EwsPageShown == "1"
-  ${AndIf} $EwsEmailValue != ""
-  ${AndIf} $EwsEmailValue != "error"
-    FileOpen $9 "$INSTDIR\.env" w
-    FileWrite $9 "EWS_EMAIL=$EwsEmailValue$\r$\n"
-    FileWrite $9 "EWS_USERNAME=$EwsUsernameValue$\r$\n"
-    FileWrite $9 "EWS_PASSWORD=$EwsPasswordValue$\r$\n"
-    FileWrite $9 "EWS_SERVER=$EwsServerValue$\r$\n"
-    FileWrite $9 "EWS_AUTH=ntlm$\r$\n"
-    FileWrite $9 "EWS_MAILBOXES=$EwsMailboxesValue$\r$\n"
-    FileClose $9
+    ${If} $EwsEmailValue != ""
+    ${AndIf} $EwsEmailValue != "error"
+      FileOpen $9 "$INSTDIR\.env" w
+      FileWrite $9 "EWS_EMAIL=$EwsEmailValue$\r$\n"
+      FileWrite $9 "EWS_USERNAME=$EwsUsernameValue$\r$\n"
+      FileWrite $9 "EWS_PASSWORD=$EwsPasswordValue$\r$\n"
+      FileWrite $9 "EWS_SERVER=$EwsServerValue$\r$\n"
+      FileWrite $9 "EWS_AUTH=ntlm$\r$\n"
+      FileWrite $9 "EWS_MAILBOXES=$EwsMailboxesValue$\r$\n"
+      ${If} $EwsTokenValue != ""
+      ${AndIf} $EwsTokenValue != "error"
+        FileWrite $9 "GH_TOKEN=$EwsTokenValue$\r$\n"
+      ${EndIf}
+      FileClose $9
+    ${ElseIf} $EwsTokenValue != ""
+    ${AndIf} $EwsTokenValue != "error"
+      ; No EWS credentials entered, but a token was — append it to a fresh/existing .env
+      ; without touching any EWS_* lines that might already be there.
+      FileOpen $9 "$INSTDIR\.env" a
+      FileWrite $9 "GH_TOKEN=$EwsTokenValue$\r$\n"
+      FileClose $9
+    ${EndIf}
   ${EndIf}
 !macroend
 
