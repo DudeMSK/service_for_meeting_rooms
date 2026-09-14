@@ -178,6 +178,7 @@ html[data-sidebar-theme="light"] .sidebar {
 .icon-text-button:hover { color: var(--sidebar-strong); background: var(--sidebar-hover); }
 .icon-text-button svg { width: 18px; height: 18px; }
 .update-alert-button { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border: 0; border-radius: 8px; color: var(--sidebar-accent); background: color-mix(in srgb, var(--sidebar-accent) 16%, transparent); cursor: pointer; }
+.update-alert-button[hidden] { display: none; }
 .update-alert-button:hover { background: color-mix(in srgb, var(--sidebar-accent) 26%, transparent); }
 .update-alert-button svg { width: 18px; height: 18px; }
 .update-alert-button.downloading svg { animation: spin 1.4s linear infinite; }
