@@ -37,6 +37,7 @@ const elements = {
 const state = {
   anchor: startOfDay(new Date()),
   view: 'day',
+  appMode: 'calendar',
   config: null,
   schedule: null,
   selectedRoomId: null,
@@ -325,6 +326,54 @@ function registerEvent(room, event) {
   return escapeHtml(key);
 }
 
+function renderOccupancy() {
+  const rooms = state.schedule?.rooms || [];
+  const now = new Date();
+  const cards = rooms.map((room) => {
+    const active = activeEvent(room, now);
+    const upcoming = nextEvent(room, now);
+    let statusTitle = 'Свободна';
+    let statusDetail = upcoming ? `Ближайшая в ${formatTime(upcoming.start)}` : 'Свободна до конца дня';
+    let busyClass = '';
+    let icon = icons.check;
+    if (active) {
+      statusTitle = 'Занята';
+      statusDetail = `До ${formatTime(active.end)} · ${active.subject}`;
+      busyClass = 'busy';
+      icon = icons.clock;
+    }
+    return `<button class="occupancy-card ${busyClass}" data-room-id="${escapeHtml(room.id)}" type="button">
+      <div class="occupancy-card-icon">${icon}</div>
+      <div class="occupancy-card-copy">
+        <strong title="${escapeHtml(room.name)}">${escapeHtml(room.name)}</strong>
+        <span class="occupancy-card-status">${escapeHtml(statusTitle)}</span>
+        <span class="occupancy-card-detail" title="${escapeHtml(statusDetail)}">${escapeHtml(statusDetail)}</span>
+      </div>
+    </button>`;
+  }).join('');
+  elements.calendar.innerHTML = `<div class="occupancy-grid">${cards}</div>`;
+}
+
+function setAppMode(mode) {
+  if (state.appMode === mode) return;
+  state.appMode = mode;
+  document.documentElement.dataset.appMode = mode;
+  document.querySelectorAll('.mode-toggle-button').forEach((button) => {
+    const active = button.dataset.mode === mode;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', String(active));
+  });
+  if (mode === 'occupancy') {
+    state.anchor = startOfDay(new Date());
+    state.view = 'day';
+    document.querySelectorAll('.view-button').forEach((item) => item.classList.toggle('active', item.dataset.view === 'day'));
+    state.schedule = null;
+    loadSchedule();
+  } else {
+    renderAll();
+  }
+}
+
 function renderCalendar() {
   elements.periodTitle.textContent = formatPeriodTitle();
   state.eventMap.clear();
@@ -338,6 +387,10 @@ function renderCalendar() {
       ? `Найдено ${state.schedule.unassignedCount} ${plural(state.schedule.unassignedCount, 'событие без места', 'события без места', 'событий без места')}.`
       : 'В выбранном периоде встреч с заполненным местом нет.';
     elements.calendar.innerHTML = `<div class="empty-state"><div class="state-card"><div class="state-icon">${icons.calendar}</div><h3>Переговорные пока не найдены</h3><p>${escapeHtml(extra)} Проверьте выбранный период и календари-источники.</p></div></div>`;
+    return;
+  }
+  if (state.appMode === 'occupancy') {
+    renderOccupancy();
     return;
   }
   const room = selectedResource();
@@ -766,14 +819,16 @@ elements.roomList.addEventListener('click', (event) => {
   const button = event.target.closest('[data-room-id]');
   if (!button) return;
   state.selectedRoomId = button.dataset.roomId;
-  renderAll();
+  if (state.appMode === 'occupancy') setAppMode('calendar');
+  else renderAll();
 });
 
 elements.onlineList.addEventListener('click', (event) => {
   const button = event.target.closest('[data-room-id]');
   if (!button) return;
   state.selectedRoomId = button.dataset.roomId;
-  renderAll();
+  if (state.appMode === 'occupancy') setAppMode('calendar');
+  else renderAll();
 });
 
 elements.calendar.addEventListener('click', (event) => {
@@ -781,6 +836,15 @@ elements.calendar.addEventListener('click', (event) => {
   if (eventButton) showEvent(eventButton.dataset.eventKey);
   const action = event.target.closest('[data-action]')?.dataset.action;
   if (action === 'retry') loadSchedule(true);
+  const occupancyCard = event.target.closest('.occupancy-card');
+  if (occupancyCard) {
+    state.selectedRoomId = occupancyCard.dataset.roomId;
+    setAppMode('calendar');
+  }
+});
+
+document.querySelectorAll('.mode-toggle-button').forEach((button) => {
+  button.addEventListener('click', () => setAppMode(button.dataset.mode));
 });
 
 elements.eventDialog.addEventListener('click', (event) => {

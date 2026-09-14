@@ -10,14 +10,9 @@
   <body>
     <div class="app-shell">
       <aside class="sidebar">
-        <div class="brand">
-          <div class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v11a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 17V6A1.5 1.5 0 0 1 5 4.5Z"/><path d="M8 2.8v3.4M16 2.8v3.4M3.5 8.5h17"/></svg>
-          </div>
-          <div>
-            <div class="brand-name">ЭРС групп</div>
-            <div class="brand-caption">Просмотр занятости переговорных</div>
-          </div>
+        <div class="mode-toggle" role="tablist" aria-label="Режим отображения">
+          <button class="mode-toggle-button active" id="calendarModeButton" data-mode="calendar" type="button" role="tab" aria-selected="true">Режим календаря</button>
+          <button class="mode-toggle-button" id="occupancyModeButton" data-mode="occupancy" type="button" role="tab" aria-selected="false">Режим занятости переговорных</button>
         </div>
 
         <div class="sidebar-scroll">
@@ -63,6 +58,7 @@
             </button>
             <h1 id="periodTitle">Сегодня</h1>
           </div>
+          <h1 class="occupancy-title" id="occupancyTitle">Занятость переговорных сейчас</h1>
           <div class="topbar-actions">
             <div class="view-switcher" role="tablist" aria-label="Масштаб календаря">
               <button class="view-button active" data-view="day" type="button">День</button>
