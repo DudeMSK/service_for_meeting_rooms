@@ -45,6 +45,19 @@ test('normalizeSettings applies safe defaults, limits refresh interval and migra
   assert.deepEqual(validateSettings(config), []);
 });
 
+test('normalizeSettings applies Fireflies limits and boolean values', () => {
+  const config = normalizeSettings({
+    firefliesEnabled: 'false',
+    firefliesPollSeconds: 5,
+    firefliesJoinLeadMinutes: 99,
+    firefliesVerifyMaxAttempts: 0,
+  });
+  assert.equal(config.firefliesEnabled, false);
+  assert.equal(config.firefliesPollSeconds, 30);
+  assert.equal(config.firefliesJoinLeadMinutes, 10);
+  assert.equal(config.firefliesVerifyMaxAttempts, 1);
+});
+
 test('normalizeSettings keeps main content and sidebar appearance independent', () => {
   const config = normalizeSettings({
     mainTheme: 'light',
@@ -170,6 +183,86 @@ test('GH_TOKEN from .env is picked up even when settings.json already exists wit
   try {
     const store = new ConfigStore({ appPath, userDataPath, safeStorage });
     assert.equal(store.load().updateToken, 'added-later-token');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('Fireflies API key is encrypted and only its presence is exposed publicly', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'meeting-room-config-'));
+  const appPath = path.join(root, 'app');
+  const userDataPath = path.join(root, 'user-data');
+  fs.mkdirSync(appPath);
+  fs.writeFileSync(path.join(appPath, '.env'), [
+    'EWS_EMAIL=service@example.org',
+    'EWS_USERNAME=service@example.org',
+    'EWS_PASSWORD=test-secret',
+    'EWS_SERVER=mail.example.org',
+    'EWS_MAILBOXES=one@example.org',
+  ].join('\n'));
+  const safeStorage = {
+    isEncryptionAvailable: () => true,
+    encryptString: (value) => Buffer.from(value, 'utf8'),
+    decryptString: (value) => value.toString('utf8'),
+  };
+  try {
+    const store = new ConfigStore({ appPath, userDataPath, safeStorage });
+    const publicResult = store.save({ firefliesApiKey: 'fireflies-secret', firefliesEnabled: true });
+    assert.equal(publicResult.firefliesApiKey, undefined);
+    assert.equal(publicResult.hasFirefliesApiKey, true);
+    assert.equal(store.load().firefliesApiKey, 'fireflies-secret');
+    const stored = JSON.parse(fs.readFileSync(path.join(userDataPath, 'settings.json'), 'utf8'));
+    assert.equal(stored.firefliesApiKey, undefined);
+    assert.ok(stored.firefliesApiKeyEncrypted);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('legacy bridge migration imports a missing Exchange setup, API key and processed state', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'meeting-room-config-'));
+  const appPath = path.join(root, 'app');
+  const userDataPath = path.join(root, 'user-data');
+  const legacyPath = path.join(root, 'legacy');
+  fs.mkdirSync(appPath);
+  fs.mkdirSync(userDataPath);
+  fs.mkdirSync(legacyPath);
+  // Explicit empty values make this test independent of any EWS variables in
+  // the shell that runs the test suite.
+  fs.writeFileSync(path.join(userDataPath, 'settings.json'), JSON.stringify({
+    email: '', username: '', server: '', mailboxes: [], firefliesApiKey: '',
+  }));
+  fs.writeFileSync(path.join(legacyPath, '.env'), [
+    'EWS_EMAIL=secretary@example.org',
+    'EWS_USERNAME=secretary@example.org',
+    'EWS_PASSWORD=legacy-password',
+    'EWS_SERVER=mail.lancloud.example.org',
+    'FIREFLIES_API_KEY=legacy-fireflies-key',
+    'TZ=Europe/Moscow',
+  ].join('\n'));
+  fs.writeFileSync(path.join(legacyPath, 'processed_meetings.json'), JSON.stringify(['https://teams.live.com/meet/1::2026-09-15T09:00:00+03:00']));
+  const safeStorage = {
+    isEncryptionAvailable: () => true,
+    encryptString: (value) => Buffer.from(value, 'utf8'),
+    decryptString: (value) => value.toString('utf8'),
+  };
+  try {
+    const store = new ConfigStore({ appPath, userDataPath, safeStorage });
+    const statePath = path.join(userDataPath, 'fireflies-state.json');
+    const result = store.migrateLegacyFireflies({
+      envPaths: [path.join(legacyPath, '.env')],
+      statePaths: [path.join(legacyPath, 'processed_meetings.json')],
+      destinationStatePath: statePath,
+    });
+    const migrated = store.load();
+    assert.equal(result.apiKeyImported, true);
+    assert.equal(result.exchangeImported, true);
+    assert.equal(result.stateImported, true);
+    assert.equal(migrated.auth, 'basic');
+    assert.equal(migrated.email, 'secretary@example.org');
+    assert.deepEqual(migrated.mailboxes, ['secretary@example.org']);
+    assert.equal(migrated.firefliesApiKey, 'legacy-fireflies-key');
+    assert.equal(fs.existsSync(statePath), true);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

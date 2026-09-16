@@ -10,6 +10,7 @@ Var EwsPasswordField
 Var EwsServerField
 Var EwsMailboxesField
 Var EwsTokenField
+Var EwsFirefliesKeyField
 
 Var EwsEmailValue
 Var EwsUsernameValue
@@ -17,6 +18,7 @@ Var EwsPasswordValue
 Var EwsServerValue
 Var EwsMailboxesValue
 Var EwsTokenValue
+Var EwsFirefliesKeyValue
 Var EwsPageShown
 
 ; Function definitions live INSIDE this macro on purpose: the macro body is only pasted
@@ -78,6 +80,11 @@ Var EwsPageShown
     ${NSD_CreatePassword} 0 98u 100% 12u ""
     Pop $EwsTokenField
 
+    ${NSD_CreateLabel} 0 114u 100% 8u "API-ключ Fireflies для автопротоколирования (необязательно)"
+    Pop $0
+    ${NSD_CreatePassword} 0 123u 100% 12u ""
+    Pop $EwsFirefliesKeyField
+
     StrCpy $EwsPageShown "1"
     nsDialogs::Show
   FunctionEnd
@@ -89,6 +96,7 @@ Var EwsPageShown
     ${NSD_GetText} $EwsServerField $EwsServerValue
     ${NSD_GetText} $EwsMailboxesField $EwsMailboxesValue
     ${NSD_GetText} $EwsTokenField $EwsTokenValue
+    ${NSD_GetText} $EwsFirefliesKeyField $EwsFirefliesKeyValue
   FunctionEnd
 !macroend
 
@@ -109,14 +117,26 @@ Var EwsPageShown
       ${AndIf} $EwsTokenValue != "error"
         FileWrite $9 "GH_TOKEN=$EwsTokenValue$\r$\n"
       ${EndIf}
+      ${If} $EwsFirefliesKeyValue != ""
+      ${AndIf} $EwsFirefliesKeyValue != "error"
+        FileWrite $9 "FIREFLIES_API_KEY=$EwsFirefliesKeyValue$\r$\n"
+      ${EndIf}
       FileClose $9
-    ${ElseIf} $EwsTokenValue != ""
-    ${AndIf} $EwsTokenValue != "error"
-      ; No EWS credentials entered, but a token was — append it to a fresh/existing .env
-      ; without touching any EWS_* lines that might already be there.
-      FileOpen $9 "$INSTDIR\.env" a
-      FileWrite $9 "GH_TOKEN=$EwsTokenValue$\r$\n"
-      FileClose $9
+    ${Else}
+      ; No EWS credentials entered — still append whichever optional secrets were
+      ; filled in, one at a time, without touching any EWS_* lines already present.
+      ${If} $EwsTokenValue != ""
+      ${AndIf} $EwsTokenValue != "error"
+        FileOpen $9 "$INSTDIR\.env" a
+        FileWrite $9 "GH_TOKEN=$EwsTokenValue$\r$\n"
+        FileClose $9
+      ${EndIf}
+      ${If} $EwsFirefliesKeyValue != ""
+      ${AndIf} $EwsFirefliesKeyValue != "error"
+        FileOpen $9 "$INSTDIR\.env" a
+        FileWrite $9 "FIREFLIES_API_KEY=$EwsFirefliesKeyValue$\r$\n"
+        FileClose $9
+      ${EndIf}
     ${EndIf}
   ${EndIf}
 !macroend

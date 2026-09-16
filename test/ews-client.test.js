@@ -1,6 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { deduplicateEvents, safeError } = require('../src/main/ews-client');
+const { bodyToText, deduplicateEvents, safeError } = require('../src/main/ews-client');
+
+test('bodyToText reads EWS MessageBody values used to find Teams links', () => {
+  assert.equal(bodyToText({ Text: 'https://teams.live.com/meet/123' }), 'https://teams.live.com/meet/123');
+  assert.equal(bodyToText(null), '');
+});
 
 test('deduplicateEvents merges the same meeting from several delegated calendars', () => {
   const base = {

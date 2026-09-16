@@ -13,6 +13,7 @@
         <div class="mode-toggle" role="tablist" aria-label="Режим отображения">
           <button class="mode-toggle-button active" id="calendarModeButton" data-mode="calendar" type="button" role="tab" aria-selected="true">Режим календаря</button>
           <button class="mode-toggle-button" id="occupancyModeButton" data-mode="occupancy" type="button" role="tab" aria-selected="false">Режим занятости переговорных</button>
+          <button class="mode-toggle-button" id="firefliesModeButton" data-mode="fireflies" type="button" role="tab" aria-selected="false">Режим бота автопротоколирования</button>
         </div>
 
         <div class="sidebar-scroll">
@@ -30,6 +31,10 @@
         </div>
 
         <div class="sidebar-bottom">
+          <div class="sync-state fireflies-state" id="firefliesState">
+            <span class="sync-dot"></span>
+            <div><strong>Fireflies</strong><small>Проверяю состояние…</small></div>
+          </div>
           <div class="sync-state" id="syncState">
             <span class="sync-dot"></span>
             <div><strong>Ожидание синхронизации</strong><small>Exchange не опрошен</small></div>
@@ -58,7 +63,8 @@
             </button>
             <h1 id="periodTitle">Сегодня</h1>
           </div>
-          <h1 class="occupancy-title" id="occupancyTitle">Занятость переговорных сейчас</h1>
+          <h1 class="mode-title" id="occupancyTitle">Занятость переговорных сейчас</h1>
+          <h1 class="mode-title" id="firefliesModeTitle">Автопротоколирование Fireflies</h1>
           <div class="topbar-actions">
             <div class="view-switcher" role="tablist" aria-label="Масштаб календаря">
               <button class="view-button active" data-view="day" type="button">День</button>
@@ -73,6 +79,34 @@
 
         <section class="room-summary" id="roomSummary"></section>
         <section class="calendar-wrap" id="calendar" aria-live="polite"></section>
+        <section class="fireflies-mode-wrap" id="firefliesModeView">
+          <p class="tab-panel-description">Бот автоматически подключается к начинающимся Teams-встречам из тех же календарей Exchange. При активном мониторинге закрытие окна сворачивает приложение в трей.</p>
+          <form id="firefliesForm">
+            <div class="form-grid fireflies-form-grid">
+              <label class="wide checkbox-field"><input name="firefliesEnabled" type="checkbox" /><span>Включить автоматическое подключение Fireflies</span></label>
+              <label class="wide"><span>API-ключ Fireflies</span><input name="firefliesApiKey" type="password" autocomplete="off" placeholder="Оставьте пустым, чтобы сохранить текущий ключ" /><small id="firefliesKeyHint">Ключ хранится в защищённом хранилище Windows и не показывается в интерфейсе.</small></label>
+              <label><span>Опрос календарей, секунд</span><input name="firefliesPollSeconds" type="number" min="30" max="600" value="60" required /></label>
+              <label><span>Подключать за, минут</span><input name="firefliesJoinLeadMinutes" type="number" min="0" max="10" value="1" required /></label>
+              <label><span>Первая проверка записи через, минут</span><input name="firefliesVerifyDelayMinutes" type="number" min="1" max="60" value="5" required /></label>
+              <label><span>Количество проверок записи</span><input name="firefliesVerifyMaxAttempts" type="number" min="1" max="10" value="3" required /></label>
+              <label><span>Повторная проверка через, минут</span><input name="firefliesVerifyRetryMinutes" type="number" min="1" max="60" value="5" required /></label>
+            </div>
+          </form>
+          <div class="fireflies-mode-actions">
+            <button class="secondary-button" id="firefliesTestButton" type="button">Проверить API</button>
+            <button class="secondary-button" id="firefliesRunButton" type="button">Проверить встречи сейчас</button>
+            <div class="actions-spacer"></div>
+            <button class="primary-button" id="firefliesSaveButton" type="button">Сохранить</button>
+          </div>
+          <div class="test-result" id="firefliesTestResult" hidden></div>
+          <div class="fireflies-dashboard">
+            <div class="fireflies-dashboard-header">
+              <div><strong id="firefliesStatusTitle">Fireflies</strong><small id="firefliesStatusDetail">Состояние загружается…</small></div>
+            </div>
+            <div class="fireflies-stats" id="firefliesStats"></div>
+            <div class="fireflies-log" id="firefliesLog"><div class="fireflies-log-empty">Событий пока нет.</div></div>
+          </div>
+        </section>
       </main>
     </div>
 

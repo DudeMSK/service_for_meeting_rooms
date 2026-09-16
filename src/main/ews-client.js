@@ -19,12 +19,19 @@ function collectionToArray(collection) {
   return [];
 }
 
-function serializeAppointment(appointment, mailbox) {
+function bodyToText(value) {
+  if (!value) return '';
+  if (typeof value.Text === 'string') return value.Text;
+  if (typeof value.ToString === 'function') return value.ToString();
+  return String(value);
+}
+
+function serializeAppointment(appointment, mailbox, { includeBody = false } = {}) {
   const resources = collectionToArray(appointment.Resources)
     .map((resource) => resource.Name || resource.Address)
     .filter(Boolean);
   const itemId = appointment.Id?.UniqueId || '';
-  return {
+  const result = {
     id: itemId,
     uid: appointment.ICalUid || itemId,
     subject: appointment.Subject || 'Занято',
@@ -42,6 +49,14 @@ function serializeAppointment(appointment, mailbox) {
     onlineMeetingUrl: appointment.JoinOnlineMeetingUrl || '',
     freeBusy: FREE_BUSY[appointment.LegacyFreeBusyStatus] || 'unknown',
   };
+  if (includeBody) {
+    try {
+      result.body = bodyToText(appointment.Body);
+    } catch {
+      result.body = '';
+    }
+  }
+  return result;
 }
 
 function deduplicateEvents(events) {
@@ -102,6 +117,23 @@ class EwsCalendarClient {
     return (result.Items || []).map((appointment) => serializeAppointment(appointment, mailbox));
   }
 
+  async #fetchMailboxForBridge(mailbox, start, end) {
+    const folderId = new ews.FolderId(ews.WellKnownFolderName.Calendar, new ews.Mailbox(mailbox));
+    const view = new ews.CalendarView(new ews.DateTime(start), new ews.DateTime(end), 100);
+    view.PropertySet = ews.PropertySet.FirstClassProperties;
+    const result = await this.service.FindAppointments(folderId, view);
+    return Promise.all((result.Items || []).map(async (appointment) => {
+      try {
+        const detailed = await ews.Appointment.Bind(this.service, appointment.Id, ews.PropertySet.FirstClassProperties);
+        return serializeAppointment(detailed, mailbox, { includeBody: true });
+      } catch {
+        // JoinOnlineMeetingUrl and Location are often already present in FindAppointments.
+        // Keep the shallow result when loading the body of one item is not permitted.
+        return serializeAppointment(appointment, mailbox, { includeBody: true });
+      }
+    }));
+  }
+
   async getSchedule(start, end) {
     this.service = this.#createService();
     const results = await Promise.allSettled(
@@ -134,6 +166,18 @@ class EwsCalendarClient {
     };
   }
 
+  async getBridgeEvents(start, end) {
+    this.service = this.#createService();
+    const results = await Promise.allSettled(
+      this.config.mailboxes.map((mailbox) => this.#fetchMailboxForBridge(mailbox, start, end)),
+    );
+    const events = results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
+    if (!events.length && results.every((result) => result.status === 'rejected')) {
+      throw new Error(safeError(results[0]?.reason, this.config));
+    }
+    return events;
+  }
+
   async testConnection() {
     const now = new Date();
     const end = new Date(now.getTime() + 60 * 60 * 1000);
@@ -147,5 +191,6 @@ module.exports = {
   deduplicateEvents,
   ewsDateToIso,
   serializeAppointment,
+  bodyToText,
   safeError,
 };

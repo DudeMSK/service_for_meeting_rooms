@@ -1,9 +1,10 @@
-const { app, BrowserWindow, ipcMain, nativeTheme, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, nativeTheme, safeStorage, Tray } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const fs = require('node:fs');
 const path = require('node:path');
 const { ConfigStore, normalizeSettings, validateSettings } = require('./config');
 const { EwsCalendarClient } = require('./ews-client');
+const { FirefliesMonitor } = require('./fireflies-service');
 const { readConfiguredRooms } = require('./rooms');
 
 const UPDATE_REPO_OWNER = 'DudeMSK';
@@ -15,6 +16,13 @@ let mainWindow;
 let configStore;
 let scheduleCache = new Map();
 let roomsFilePath;
+let firefliesMonitor;
+let tray;
+let isQuitting = false;
+let trayNoticeShown = false;
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!hasSingleInstanceLock) app.quit();
 
 function getClient(override = null) {
   const current = configStore.load();
@@ -114,6 +122,54 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => mainWindow.show());
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
+  mainWindow.on('close', (event) => {
+    const config = configStore.load();
+    if (isQuitting || !config.firefliesEnabled || !config.firefliesApiKey) return;
+    event.preventDefault();
+    mainWindow.hide();
+    if (tray && !trayNoticeShown) {
+      tray.displayBalloon({
+        title: 'ЭРС групп',
+        content: 'Окно скрыто, мониторинг Fireflies продолжает работать. Для полного выхода используйте меню значка в трее.',
+      });
+      trayNoticeShown = true;
+    }
+  });
+}
+
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function syncTray() {
+  const config = configStore.load();
+  const needed = config.firefliesEnabled && Boolean(config.firefliesApiKey);
+  if (!needed && tray) {
+    tray.destroy();
+    tray = null;
+    return;
+  }
+  if (!needed || tray) return;
+  tray = new Tray(path.join(__dirname, '..', '..', 'assets', 'icon.ico'));
+  tray.setToolTip('ЭРС групп | календарь и Fireflies');
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Открыть', click: showMainWindow },
+    { type: 'separator' },
+    {
+      label: 'Выход',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]));
+  tray.on('double-click', showMainWindow);
+}
+
+function sendFirefliesStatus(status) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('fireflies:status', status);
 }
 
 function registerIpc() {
@@ -143,6 +199,8 @@ function registerIpc() {
   ipcMain.handle('config:save', (_event, input) => {
     const result = configStore.save(input || {});
     scheduleCache.clear();
+    syncTray();
+    firefliesMonitor?.reconfigure();
     return { ...result, roomsFilePath };
   });
 
@@ -160,21 +218,57 @@ function registerIpc() {
     if (scheduleCache.size > 12) scheduleCache.delete(scheduleCache.keys().next().value);
     return { ...value, cached: false };
   });
+
+  ipcMain.handle('fireflies:get-status', () => firefliesMonitor.getStatus());
+  ipcMain.handle('fireflies:test', (_event, input) => firefliesMonitor.testApi(input?.apiKey));
+  ipcMain.handle('fireflies:run-now', () => firefliesMonitor.runNow());
 }
 
-app.whenReady().then(() => {
+if (hasSingleInstanceLock) app.whenReady().then(() => {
   const appPath = app.getAppPath();
   const userDataPath = app.getPath('userData');
   configStore = new ConfigStore({ appPath, userDataPath, safeStorage });
   configStore.persistEnvironmentIfNeeded();
   roomsFilePath = ensureRoomsFile(appPath, userDataPath);
+  const firefliesStatePath = path.join(userDataPath, 'fireflies-state.json');
+  const localAppData = process.env.LOCALAPPDATA || '';
+  const legacyDirectories = [
+    path.resolve(appPath, '..', 'lancloud-fireflies-bridge'),
+    localAppData ? path.join(localAppData, 'Programs', 'LanCloud Fireflies Bridge') : '',
+  ].filter(Boolean);
+  try {
+    configStore.migrateLegacyFireflies({
+      envPaths: legacyDirectories.map((directory) => path.join(directory, '.env')),
+      statePaths: legacyDirectories.map((directory) => path.join(directory, 'processed_meetings.json')),
+      destinationStatePath: firefliesStatePath,
+    });
+  } catch {
+    // Migration is best-effort. The Fireflies tab remains available for manual setup.
+  }
+  firefliesMonitor = new FirefliesMonitor({
+    configStore,
+    createEwsClient: () => getClient(),
+    statePath: firefliesStatePath,
+    onStatus: sendFirefliesStatus,
+  });
   registerIpc();
   registerAutoUpdaterEvents();
   createWindow();
+  syncTray();
+  firefliesMonitor.start();
   scheduleAutoUpdateChecks();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on('second-instance', () => {
+  if (hasSingleInstanceLock) showMainWindow();
+});
+
+app.on('before-quit', () => {
+  isQuitting = true;
+  firefliesMonitor?.stop();
 });
 
 app.on('window-all-closed', () => {

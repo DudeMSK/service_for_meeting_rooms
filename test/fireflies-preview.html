@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Fireflies preview</title>
+  </head>
+  <body>
+    <script>
+      const previewConfig = {
+        configured: true,
+        email: 'service@example.org',
+        username: 'service@example.org',
+        server: 'mail.example.org',
+        ewsPath: '/EWS/Exchange.asmx',
+        auth: 'basic',
+        timeZone: 'Europe/Moscow',
+        refreshMinutes: 5,
+        mailboxes: ['calendar@example.org'],
+        mainTheme: 'light',
+        mainAccent: 'green',
+        sidebarTheme: 'dark',
+        sidebarAccent: 'green',
+        firefliesEnabled: true,
+        hasFirefliesApiKey: true,
+        firefliesPollSeconds: 60,
+        firefliesJoinLeadMinutes: 1,
+        firefliesVerifyDelayMinutes: 5,
+        firefliesVerifyMaxAttempts: 3,
+        firefliesVerifyRetryMinutes: 5,
+      };
+      const previewStatus = {
+        mode: 'running',
+        title: 'Fireflies работает',
+        detail: 'Проверено Teams-встреч: 2',
+        processedCount: 18,
+        pendingCount: 1,
+        lastCheckedAt: '2026-09-15T09:31:00.000Z',
+        nextCheckAt: '2026-09-15T09:32:00.000Z',
+        logs: [
+          { at: '2026-09-15T09:31:00.000Z', level: 'success', message: 'Бот Fireflies отправлен на встречу «Еженедельная планёрка». ' },
+          { at: '2026-09-15T09:30:00.000Z', level: 'info', message: 'Проверены ближайшие Teams-встречи.' },
+        ],
+      };
+      const emptySchedule = () => ({
+        rooms: [],
+        online: { id: 'online-meetings', name: 'Все онлайн встречи', source: 'online', events: [] },
+        mailboxResults: [{ mailbox: 'calendar@example.org', ok: true, eventCount: 0 }],
+        eventCount: 0,
+        unassignedCount: 0,
+        fetchedAt: new Date().toISOString(),
+      });
+      window.meetingRooms = {
+        getConfig: async () => previewConfig,
+        saveConfig: async (input) => Object.assign(previewConfig, input, { hasFirefliesApiKey: true }),
+        testConfig: async () => ({ ok: true, mailboxResults: emptySchedule().mailboxResults }),
+        getSchedule: async () => emptySchedule(),
+        getFirefliesStatus: async () => previewStatus,
+        testFireflies: async () => ({ ok: true, email: 'fireflies@example.org' }),
+        runFirefliesNow: async () => previewStatus,
+        getAppVersion: async () => '1.8.0-preview',
+        checkForUpdates: async () => {}, downloadUpdate: async () => {}, installUpdate: async () => {},
+        onUpdateStatus: () => () => {},
+        onFirefliesStatus: (callback) => { setTimeout(() => callback(previewStatus), 0); return () => {}; },
+      };
+      (async () => {
+        const source = await fetch('../src/renderer/index.html').then((response) => response.text());
+        document.open();
+        document.write(source.replace('<head>', '<head><base href="../src/renderer/">').replace('<script src="./app.js"></script>', ''));
+        document.close();
+        const script = document.createElement('script');
+        script.src = '../src/renderer/app.js';
+        document.body.append(script);
+      })();
+    </script>
+  </body>
+</html>
