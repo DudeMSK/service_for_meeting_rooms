@@ -19,14 +19,36 @@ const elements = {
   appVersionLabel: document.querySelector('#appVersionLabel'),
   updateStatus: document.querySelector('#updateStatus'),
   updateButton: document.querySelector('#updateButton'),
+  updateAlertButton: document.querySelector('#updateAlertButton'),
+  updateDialog: document.querySelector('#updateDialog'),
+  updateDialogClose: document.querySelector('#updateDialogClose'),
+  updateModalIcon: document.querySelector('#updateModalIcon'),
+  updateModalTitle: document.querySelector('#updateModalTitle'),
+  updateModalDetail: document.querySelector('#updateModalDetail'),
+  updateProgressFill: document.querySelector('#updateProgressFill'),
+  updateModalActions: document.querySelector('#updateModalActions'),
+  updateLaterButton: document.querySelector('#updateLaterButton'),
+  updateRestartButton: document.querySelector('#updateRestartButton'),
   eventDialog: document.querySelector('#eventDialog'),
   eventDetails: document.querySelector('#eventDetails'),
   toastRegion: document.querySelector('#toastRegion'),
+  firefliesState: document.querySelector('#firefliesState'),
+  firefliesModeView: document.querySelector('#firefliesModeView'),
+  firefliesForm: document.querySelector('#firefliesForm'),
+  firefliesTestButton: document.querySelector('#firefliesTestButton'),
+  firefliesRunButton: document.querySelector('#firefliesRunButton'),
+  firefliesSaveButton: document.querySelector('#firefliesSaveButton'),
+  firefliesTestResult: document.querySelector('#firefliesTestResult'),
+  firefliesStatusTitle: document.querySelector('#firefliesStatusTitle'),
+  firefliesStatusDetail: document.querySelector('#firefliesStatusDetail'),
+  firefliesStats: document.querySelector('#firefliesStats'),
+  firefliesLog: document.querySelector('#firefliesLog'),
 };
 
 const state = {
   anchor: startOfDay(new Date()),
   view: 'day',
+  appMode: 'calendar',
   config: null,
   schedule: null,
   selectedRoomId: null,
@@ -34,6 +56,9 @@ const state = {
   loading: false,
   refreshTimer: null,
   updateMode: 'idle',
+  updateVersion: '',
+  updatePercent: 0,
+  updateErrorMessage: '',
 };
 
 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
@@ -44,6 +69,11 @@ const icons = {
   calendar: '<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M8 3v4M16 3v4M3.5 9h17"/></svg>',
   warning: '<svg viewBox="0 0 24 24"><path d="M10.3 4.2 2.7 17.4A1.8 1.8 0 0 0 4.3 20h15.4a1.8 1.8 0 0 0 1.6-2.6L13.7 4.2a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 16.5h.01"/></svg>',
   video: '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg>',
+};
+
+const updateIcons = {
+  download: '<svg viewBox="0 0 24 24"><path d="M12 4v10m0 0-3.5-3.5M12 14l3.5-3.5"/><path d="M5 18h14"/></svg>',
+  ready: '<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 4v4h-4M6 20v-4h4"/></svg>',
 };
 
 function escapeHtml(value) {
@@ -215,7 +245,7 @@ function renderRoomList() {
         detail = `Занята до ${formatTime(active.end)}`;
         status = 'busy';
       } else if (showsNow) {
-        detail = upcoming ? `Свободна  далее в ${formatTime(upcoming.start)}` : 'Свободна до конца периода';
+        detail = upcoming ? `Свободна | Ближайшая в ${formatTime(upcoming.start)}` : 'Свободна до конца периода';
         status = '';
       }
       return `<button class="room-item ${room.id === state.selectedRoomId ? 'active' : ''}" data-room-id="${escapeHtml(room.id)}" type="button">
@@ -307,6 +337,178 @@ function registerEvent(room, event) {
   return escapeHtml(key);
 }
 
+function renderOccupancy() {
+  const rooms = state.schedule?.rooms || [];
+  const now = new Date();
+  const cards = rooms.map((room) => {
+    const active = activeEvent(room, now);
+    const upcoming = nextEvent(room, now);
+    let statusTitle = 'Свободна';
+    let statusDetail = upcoming ? `Ближайшая в ${formatTime(upcoming.start)}` : 'Свободна до конца дня';
+    let busyClass = '';
+    let icon = icons.check;
+    if (active) {
+      statusTitle = 'Занята';
+      statusDetail = `До ${formatTime(active.end)} · ${active.subject}`;
+      busyClass = 'busy';
+      icon = icons.clock;
+    }
+    return `<button class="occupancy-card ${busyClass}" data-room-id="${escapeHtml(room.id)}" type="button">
+      <div class="occupancy-card-icon">${icon}</div>
+      <div class="occupancy-card-copy">
+        <strong title="${escapeHtml(room.name)}">${escapeHtml(room.name)}</strong>
+        <span class="occupancy-card-status">${escapeHtml(statusTitle)}</span>
+        <span class="occupancy-card-detail" title="${escapeHtml(statusDetail)}">${escapeHtml(statusDetail)}</span>
+      </div>
+    </button>`;
+  }).join('');
+  elements.calendar.innerHTML = `<div class="occupancy-grid">${cards}</div>`;
+}
+
+function firefliesStatusKind(mode) {
+  if (mode === 'running') return 'ok';
+  if (mode === 'checking') return 'loading';
+  if (mode === 'disabled' || mode === 'needs-configuration' || mode === 'stopped') return 'disabled';
+  return 'error';
+}
+
+function renderFirefliesStatusCard(status) {
+  if (!elements.firefliesState) return;
+  const kind = firefliesStatusKind(status.mode);
+  elements.firefliesState.className = `sync-state fireflies-state ${kind}`;
+  elements.firefliesState.innerHTML = `<span class="sync-dot"></span><div><strong>${escapeHtml(status.title || 'Fireflies')}</strong><small title="${escapeHtml(status.detail || '')}">${escapeHtml(status.detail || '')}</small></div>`;
+}
+
+function renderFirefliesDashboard(status) {
+  elements.firefliesStatusTitle.textContent = status.title || 'Fireflies';
+  elements.firefliesStatusDetail.textContent = status.detail || '';
+  const stats = [
+    `Отправлено ботов: ${status.processedCount ?? 0}`,
+    `Ожидает подтверждения: ${status.pendingCount ?? 0}`,
+  ];
+  if (status.nextCheckAt) stats.push(`Следующая проверка: ${formatTime(status.nextCheckAt)}`);
+  if (status.lastCheckedAt) stats.push(`Последняя проверка: ${formatTime(status.lastCheckedAt)}`);
+  elements.firefliesStats.innerHTML = stats.map((item) => `<span class="fireflies-stat">${escapeHtml(item)}</span>`).join('');
+  const logs = status.logs || [];
+  elements.firefliesLog.innerHTML = logs.length
+    ? logs.map((entry) => `<div class="fireflies-log-entry ${escapeHtml(entry.level)}"><time>${escapeHtml(formatTime(entry.at))}</time><span class="fireflies-log-level">${escapeHtml(entry.level)}</span><span>${escapeHtml(entry.message)}</span></div>`).join('')
+    : '<div class="fireflies-log-empty">Событий пока нет.</div>';
+}
+
+function handleFirefliesStatus(status) {
+  if (!status) return;
+  renderFirefliesStatusCard(status);
+  renderFirefliesDashboard(status);
+}
+
+function populateFirefliesForm() {
+  const form = elements.firefliesForm.elements;
+  form.firefliesEnabled.checked = Boolean(state.config?.firefliesEnabled);
+  form.firefliesApiKey.value = '';
+  form.firefliesApiKey.placeholder = state.config?.hasFirefliesApiKey
+    ? 'Ключ уже сохранён — оставьте пустым, чтобы не менять'
+    : 'Введите API-ключ Fireflies';
+  form.firefliesPollSeconds.value = state.config?.firefliesPollSeconds || 60;
+  form.firefliesJoinLeadMinutes.value = state.config?.firefliesJoinLeadMinutes ?? 1;
+  form.firefliesVerifyDelayMinutes.value = state.config?.firefliesVerifyDelayMinutes || 5;
+  form.firefliesVerifyMaxAttempts.value = state.config?.firefliesVerifyMaxAttempts || 3;
+  form.firefliesVerifyRetryMinutes.value = state.config?.firefliesVerifyRetryMinutes || 5;
+  elements.firefliesTestResult.hidden = true;
+}
+
+function firefliesSettingsFromForm() {
+  const form = elements.firefliesForm.elements;
+  return {
+    firefliesEnabled: form.firefliesEnabled.checked,
+    firefliesApiKey: form.firefliesApiKey.value.trim(),
+    firefliesPollSeconds: form.firefliesPollSeconds.value,
+    firefliesJoinLeadMinutes: form.firefliesJoinLeadMinutes.value,
+    firefliesVerifyDelayMinutes: form.firefliesVerifyDelayMinutes.value,
+    firefliesVerifyMaxAttempts: form.firefliesVerifyMaxAttempts.value,
+    firefliesVerifyRetryMinutes: form.firefliesVerifyRetryMinutes.value,
+  };
+}
+
+async function testFireflies() {
+  const apiKeyInput = elements.firefliesForm.elements.firefliesApiKey.value.trim();
+  elements.firefliesTestButton.disabled = true;
+  elements.firefliesTestButton.textContent = 'Проверяю…';
+  elements.firefliesTestResult.hidden = true;
+  try {
+    await api.testFireflies(apiKeyInput ? { apiKey: apiKeyInput } : {});
+    elements.firefliesTestResult.className = 'test-result';
+    elements.firefliesTestResult.textContent = 'Подключение к Fireflies успешно.';
+    elements.firefliesTestResult.hidden = false;
+  } catch (error) {
+    elements.firefliesTestResult.className = 'test-result error';
+    elements.firefliesTestResult.textContent = cleanError(error);
+    elements.firefliesTestResult.hidden = false;
+  } finally {
+    elements.firefliesTestButton.disabled = false;
+    elements.firefliesTestButton.textContent = 'Проверить API';
+  }
+}
+
+async function runFirefliesNow() {
+  elements.firefliesRunButton.disabled = true;
+  elements.firefliesRunButton.textContent = 'Проверяю…';
+  try {
+    const status = await api.runFirefliesNow();
+    handleFirefliesStatus(status);
+    showToast('Проверка встреч запущена.');
+  } catch (error) {
+    showToast(cleanError(error), 'error');
+  } finally {
+    elements.firefliesRunButton.disabled = false;
+    elements.firefliesRunButton.textContent = 'Проверить встречи сейчас';
+  }
+}
+
+async function saveFirefliesSettings() {
+  if (!elements.firefliesForm.reportValidity()) return;
+  elements.firefliesSaveButton.disabled = true;
+  elements.firefliesSaveButton.textContent = 'Сохраняю…';
+  try {
+    state.config = await api.saveConfig(firefliesSettingsFromForm());
+    populateFirefliesForm();
+    showToast('Настройки Fireflies сохранены.');
+  } catch (error) {
+    elements.firefliesTestResult.className = 'test-result error';
+    elements.firefliesTestResult.textContent = cleanError(error);
+    elements.firefliesTestResult.hidden = false;
+  } finally {
+    elements.firefliesSaveButton.disabled = false;
+    elements.firefliesSaveButton.textContent = 'Сохранить';
+  }
+}
+
+function openFirefliesMode() {
+  populateFirefliesForm();
+  api.getFirefliesStatus().then(handleFirefliesStatus).catch(() => {});
+}
+
+function setAppMode(mode) {
+  if (state.appMode === mode) return;
+  state.appMode = mode;
+  document.documentElement.dataset.appMode = mode;
+  document.querySelectorAll('.mode-toggle-button').forEach((button) => {
+    const active = button.dataset.mode === mode;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', String(active));
+  });
+  if (mode === 'occupancy') {
+    state.anchor = startOfDay(new Date());
+    state.view = 'day';
+    document.querySelectorAll('.view-button').forEach((item) => item.classList.toggle('active', item.dataset.view === 'day'));
+    state.schedule = null;
+    loadSchedule();
+  } else if (mode === 'fireflies') {
+    openFirefliesMode();
+  } else {
+    renderAll();
+  }
+}
+
 function renderCalendar() {
   elements.periodTitle.textContent = formatPeriodTitle();
   state.eventMap.clear();
@@ -320,6 +522,10 @@ function renderCalendar() {
       ? `Найдено ${state.schedule.unassignedCount} ${plural(state.schedule.unassignedCount, 'событие без места', 'события без места', 'событий без места')}.`
       : 'В выбранном периоде встреч с заполненным местом нет.';
     elements.calendar.innerHTML = `<div class="empty-state"><div class="state-card"><div class="state-icon">${icons.calendar}</div><h3>Переговорные пока не найдены</h3><p>${escapeHtml(extra)} Проверьте выбранный период и календари-источники.</p></div></div>`;
+    return;
+  }
+  if (state.appMode === 'occupancy') {
+    renderOccupancy();
     return;
   }
   const room = selectedResource();
@@ -353,7 +559,9 @@ function renderDay(room) {
     const lane = overlapping ? previousOverlapCount % 2 : 0;
     const horizontal = overlapping ? (lane === 0 ? 'left:12px;right:50.5%;' : 'left:50.5%;right:12px;') : 'left:12px;right:12px;';
     const key = registerEvent(room, event);
-    return `<button class="event-block ${event.freeBusy === 'tentative' ? 'tentative' : ''} ${room.source === 'online' ? 'online' : ''}" data-event-key="${key}" type="button" style="top:${top}px;height:${height}px;${horizontal}"><strong>${escapeHtml(event.subject)}</strong><span>${formatTime(event.start)}–${formatTime(event.end)}${event.organizer ? ` · ${escapeHtml(event.organizer)}` : ''}</span></button>`;
+    const compact = height < 40;
+    const timeLabel = `${formatTime(event.start)}–${formatTime(event.end)}${event.organizer ? ` · ${escapeHtml(event.organizer)}` : ''}`;
+    return `<button class="event-block ${compact ? 'compact' : ''} ${event.freeBusy === 'tentative' ? 'tentative' : ''} ${room.source === 'online' ? 'online' : ''}" data-event-key="${key}" type="button" style="top:${top}px;height:${height}px;${horizontal}"><strong>${escapeHtml(event.subject)}</strong><span>${timeLabel}</span></button>`;
   }).join('');
   const hours = Array.from({ length: endHour - startHour + 1 }, (_, index) => {
     const hour = startHour + index;
@@ -510,21 +718,25 @@ function handleUpdateStatus(status) {
     setUpdateStatus('У вас установлена последняя версия.');
   } else if (status.type === 'available') {
     state.updateMode = 'available';
+    state.updateVersion = status.version;
     elements.updateButton.disabled = false;
     elements.updateButton.textContent = 'Скачать и установить';
     setUpdateStatus(`Доступна версия ${status.version}.`, 'available');
   } else if (status.type === 'progress') {
     state.updateMode = 'downloading';
+    state.updatePercent = status.percent;
     elements.updateButton.disabled = true;
     elements.updateButton.textContent = `Скачивание… ${status.percent}%`;
     setUpdateStatus(`Скачивание обновления: ${status.percent}%.`);
   } else if (status.type === 'downloaded') {
     state.updateMode = 'downloaded';
+    state.updateVersion = status.version;
     elements.updateButton.disabled = false;
     elements.updateButton.textContent = 'Перезапустить и установить';
     setUpdateStatus(`Версия ${status.version} готова к установке.`, 'available');
   } else if (status.type === 'error') {
     state.updateMode = 'idle';
+    state.updateErrorMessage = cleanError(status.message);
     elements.updateButton.disabled = false;
     elements.updateButton.textContent = 'Проверить обновления';
     setUpdateStatus(cleanError(status.message), 'error');
@@ -533,6 +745,64 @@ function handleUpdateStatus(status) {
     elements.updateButton.disabled = false;
     elements.updateButton.textContent = 'Проверить обновления';
     setUpdateStatus('Проверка обновлений недоступна в режиме разработки (npm start) — работает только в установленном приложении.');
+  }
+  syncUpdateAlertButton();
+  if (elements.updateDialog.open) renderUpdateModal();
+}
+
+function syncUpdateAlertButton() {
+  const visible = ['available', 'downloading', 'downloaded'].includes(state.updateMode);
+  elements.updateAlertButton.hidden = !visible;
+  elements.updateAlertButton.classList.toggle('downloading', state.updateMode === 'downloading');
+  elements.updateAlertButton.innerHTML = state.updateMode === 'downloaded' ? updateIcons.ready : updateIcons.download;
+  elements.updateAlertButton.title = state.updateMode === 'downloaded'
+    ? `Версия ${state.updateVersion} готова к установке — нажмите, чтобы перезапустить`
+    : state.updateMode === 'downloading'
+      ? `Скачивание обновления… ${state.updatePercent}%`
+      : `Доступна версия ${state.updateVersion}`;
+}
+
+function renderUpdateModal() {
+  const mode = state.updateMode;
+  if (mode === 'downloading') {
+    elements.updateModalIcon.innerHTML = updateIcons.download;
+    elements.updateModalTitle.textContent = state.updateVersion ? `Скачивание версии ${state.updateVersion}` : 'Скачивание обновления';
+    elements.updateModalDetail.textContent = `${state.updatePercent}%`;
+    elements.updateProgressFill.style.width = `${state.updatePercent}%`;
+    elements.updateModalActions.hidden = true;
+  } else if (mode === 'downloaded') {
+    elements.updateModalIcon.innerHTML = updateIcons.ready;
+    elements.updateModalTitle.textContent = `Версия ${state.updateVersion} готова к установке`;
+    elements.updateModalDetail.textContent = 'Установите сейчас или при следующем закрытии приложения.';
+    elements.updateProgressFill.style.width = '100%';
+    elements.updateModalActions.hidden = false;
+  } else if (mode === 'available') {
+    elements.updateModalIcon.innerHTML = updateIcons.download;
+    elements.updateModalTitle.textContent = `Начинаю скачивание версии ${state.updateVersion}`;
+    elements.updateModalDetail.textContent = 'Подготовка…';
+    elements.updateProgressFill.style.width = '0%';
+    elements.updateModalActions.hidden = true;
+  } else {
+    elements.updateModalIcon.innerHTML = updateIcons.download;
+    elements.updateModalTitle.textContent = state.updateErrorMessage ? 'Не удалось скачать обновление' : 'Обновление недоступно';
+    elements.updateModalDetail.textContent = state.updateErrorMessage || '';
+    elements.updateProgressFill.style.width = '0%';
+    elements.updateModalActions.hidden = true;
+  }
+}
+
+async function openUpdateDialog() {
+  if (!elements.updateDialog.open) elements.updateDialog.showModal();
+  renderUpdateModal();
+  if (state.updateMode === 'available') {
+    try {
+      await api.downloadUpdate();
+    } catch (error) {
+      state.updateMode = 'idle';
+      state.updateErrorMessage = cleanError(error);
+      syncUpdateAlertButton();
+      renderUpdateModal();
+    }
   }
 }
 
@@ -657,6 +927,25 @@ document.querySelectorAll('.settings-tab').forEach((button) => {
 });
 elements.updateButton.addEventListener('click', handleUpdateButtonClick);
 api.onUpdateStatus(handleUpdateStatus);
+api.onFirefliesStatus(handleFirefliesStatus);
+
+elements.updateAlertButton.addEventListener('click', openUpdateDialog);
+elements.updateDialogClose.addEventListener('click', () => elements.updateDialog.close());
+elements.updateDialog.addEventListener('click', (event) => {
+  if (event.target === elements.updateDialog) elements.updateDialog.close();
+});
+elements.updateLaterButton.addEventListener('click', () => elements.updateDialog.close());
+elements.updateRestartButton.addEventListener('click', async () => {
+  try {
+    await api.installUpdate();
+  } catch {
+    // The app quits as part of a successful install; a rejected/unsettled promise here is expected noise.
+  }
+});
+
+elements.firefliesTestButton.addEventListener('click', testFireflies);
+elements.firefliesRunButton.addEventListener('click', runFirefliesNow);
+elements.firefliesSaveButton.addEventListener('click', saveFirefliesSettings);
 
 document.querySelectorAll('.view-button').forEach((button) => button.addEventListener('click', () => {
   if (state.view === button.dataset.view) return;
@@ -670,14 +959,16 @@ elements.roomList.addEventListener('click', (event) => {
   const button = event.target.closest('[data-room-id]');
   if (!button) return;
   state.selectedRoomId = button.dataset.roomId;
-  renderAll();
+  if (state.appMode !== 'calendar') setAppMode('calendar');
+  else renderAll();
 });
 
 elements.onlineList.addEventListener('click', (event) => {
   const button = event.target.closest('[data-room-id]');
   if (!button) return;
   state.selectedRoomId = button.dataset.roomId;
-  renderAll();
+  if (state.appMode !== 'calendar') setAppMode('calendar');
+  else renderAll();
 });
 
 elements.calendar.addEventListener('click', (event) => {
@@ -685,6 +976,15 @@ elements.calendar.addEventListener('click', (event) => {
   if (eventButton) showEvent(eventButton.dataset.eventKey);
   const action = event.target.closest('[data-action]')?.dataset.action;
   if (action === 'retry') loadSchedule(true);
+  const occupancyCard = event.target.closest('.occupancy-card');
+  if (occupancyCard) {
+    state.selectedRoomId = occupancyCard.dataset.roomId;
+    setAppMode('calendar');
+  }
+});
+
+document.querySelectorAll('.mode-toggle-button').forEach((button) => {
+  button.addEventListener('click', () => setAppMode(button.dataset.mode));
 });
 
 elements.eventDialog.addEventListener('click', (event) => {
@@ -717,6 +1017,7 @@ async function initialize() {
     state.config = await api.getConfig();
     applyAppearance();
     scheduleAutoRefresh();
+    api.getFirefliesStatus().then(handleFirefliesStatus).catch(() => {});
     if (!state.config.configured) {
       renderAll();
       openSettings();

@@ -5,9 +5,14 @@ const MAX_LOG_ENTRIES = 200;
 const MAX_PROCESSED_AGE_MS = 180 * 24 * 60 * 60 * 1000;
 const LOCAL_RATE_LIMIT_WINDOW_MS = 20 * 60 * 1000;
 const LOCAL_RATE_LIMIT_COUNT = 3;
+const API_RATE_LIMIT_BASE_BACKOFF_MS = 5 * 60 * 1000;
+const API_RATE_LIMIT_MAX_BACKOFF_MS = 60 * 60 * 1000;
+const API_RATE_LIMIT_SAFETY_MARGIN_MS = 30 * 1000;
 
 const MEETING_LINK_PATTERN = /https:\/\/(?:teams\.microsoft\.com\/(?:l\/meetup-join|meet)\/|teams\.live\.com\/meet\/)[^\s"'<>]+/i;
 const ROOM_NAME_PATTERN = /Групп\s+(\S+)\s*\(/i;
+const RATE_LIMIT_ERROR_PATTERN = /too many requests|rate.?limit/i;
+const RETRY_AFTER_PATTERN = /retry after\s+(.+?GMT)/i;
 
 function cleanMeetingLink(value) {
   const decoded = String(value || '')
@@ -41,6 +46,31 @@ function normalizeStoredMeetingKey(key) {
 function clampInteger(value, min, max, fallback) {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
+}
+
+function isRateLimitError(error) {
+  return RATE_LIMIT_ERROR_PATTERN.test(error?.message || '');
+}
+
+function parseRetryAfter(message) {
+  const match = String(message || '').match(RETRY_AFTER_PATTERN);
+  if (!match) return null;
+  const date = new Date(match[1]);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+// Prefer the server's own "retry after" hint when it parses to a real, still-future
+// date; otherwise fall back to a doubling backoff (5m, 10m, 20m, ... capped at 1h) so
+// repeated rate-limit responses (with no usable hint, or a stale/malformed one) don't
+// keep the monitor hammering the API every single poll cycle.
+function computeBackoffUntil({ error, now, consecutiveHits }) {
+  const retryAfter = parseRetryAfter(error?.message);
+  if (retryAfter && retryAfter.getTime() > now.getTime()) {
+    return new Date(retryAfter.getTime() + API_RATE_LIMIT_SAFETY_MARGIN_MS);
+  }
+  const exponent = Math.min(Math.max(consecutiveHits, 1) - 1, 6);
+  const delay = Math.min(API_RATE_LIMIT_BASE_BACKOFF_MS * 2 ** exponent, API_RATE_LIMIT_MAX_BACKOFF_MS);
+  return new Date(now.getTime() + delay);
 }
 
 function firefliesErrorMessage(errors) {
@@ -194,7 +224,13 @@ class FirefliesMonitor {
   #loadState() {
     const raw = readJson(this.statePath, {});
     if (Array.isArray(raw)) {
-      return { processed: Object.fromEntries(raw.map((key) => [normalizeStoredMeetingKey(key), { sentAt: null, status: 'sent' }])), pending: [], logs: [] };
+      return {
+        processed: Object.fromEntries(raw.map((key) => [normalizeStoredMeetingKey(key), { sentAt: null, status: 'sent' }])),
+        pending: [],
+        logs: [],
+        rateLimitedUntil: null,
+        rateLimitConsecutiveHits: 0,
+      };
     }
     const processed = {};
     for (const [key, value] of Object.entries(raw?.processed || {})) processed[normalizeStoredMeetingKey(key)] = value;
@@ -202,6 +238,8 @@ class FirefliesMonitor {
       processed,
       pending: Array.isArray(raw?.pending) ? raw.pending : [],
       logs: Array.isArray(raw?.logs) ? raw.logs.slice(-MAX_LOG_ENTRIES) : [],
+      rateLimitedUntil: raw?.rateLimitedUntil || null,
+      rateLimitConsecutiveHits: Number.isFinite(raw?.rateLimitConsecutiveHits) ? raw.rateLimitConsecutiveHits : 0,
     };
   }
 
@@ -237,9 +275,41 @@ class FirefliesMonitor {
     };
   }
 
+  #activeBackoff(now) {
+    return this.data.rateLimitedUntil && new Date(this.data.rateLimitedUntil) > now ? new Date(this.data.rateLimitedUntil) : null;
+  }
+
+  // Returns true when `error` was a Fireflies rate-limit response, having already
+  // recorded a backoff window for it; callers should stop making further Fireflies
+  // requests for the rest of the current tick when this returns true.
+  #handleRateLimit(error, now) {
+    if (!isRateLimitError(error)) return false;
+    this.data.rateLimitConsecutiveHits = (this.data.rateLimitConsecutiveHits || 0) + 1;
+    this.data.rateLimitedUntil = computeBackoffUntil({ error, now, consecutiveHits: this.data.rateLimitConsecutiveHits }).toISOString();
+    this.#saveState();
+    return true;
+  }
+
+  #clearRateLimit() {
+    if (this.data.rateLimitConsecutiveHits || this.data.rateLimitedUntil) {
+      this.data.rateLimitConsecutiveHits = 0;
+      this.data.rateLimitedUntil = null;
+    }
+  }
+
   async testApi(apiKey) {
     const config = this.configStore.load();
-    return this.api.testConnection(apiKey || config.firefliesApiKey);
+    const now = this.now();
+    const until = this.#activeBackoff(now);
+    if (until) throw new Error(`Fireflies временно ограничил частоту запросов. Попробуйте после ${formatMeetingDate(until, config.timeZone)}.`);
+    try {
+      const result = await this.api.testConnection(apiKey || config.firefliesApiKey);
+      this.#clearRateLimit();
+      return result;
+    } catch (error) {
+      this.#handleRateLimit(error, now);
+      throw error;
+    }
   }
 
   start() {
@@ -291,8 +361,9 @@ class FirefliesMonitor {
 
   async #processVerifications(config, now) {
     const stillPending = [];
+    let rateLimited = false;
     for (const item of this.data.pending) {
-      if (new Date(item.nextCheckAt) > now) {
+      if (rateLimited || new Date(item.nextCheckAt) > now) {
         stillPending.push(item);
         continue;
       }
@@ -305,8 +376,16 @@ class FirefliesMonitor {
           toDate: new Date(new Date(item.end).getTime() + (config.firefliesVerifyDelayMinutes + config.firefliesVerifyRetryMinutes * config.firefliesVerifyMaxAttempts + 5) * 60 * 1000),
         });
       } catch (error) {
+        if (this.#handleRateLimit(error, now)) {
+          // Not the item's fault — don't burn an attempt, just retry once the pause ends.
+          rateLimited = true;
+          this.#log('warning', `Fireflies ограничил частоту запросов при проверке записи «${item.title}» — приостанавливаю проверки до ${formatMeetingDate(this.data.rateLimitedUntil, config.timeZone)}.`);
+          stillPending.push(item);
+          continue;
+        }
         this.#log('error', `Не удалось проверить запись «${item.title}»: ${error.message}`);
       }
+      this.#clearRateLimit();
       if (found) {
         if (this.data.processed[item.key]) this.data.processed[item.key].status = 'recorded';
         this.#log('success', `Подтверждена запись встречи «${item.title}».`);
@@ -336,9 +415,27 @@ class FirefliesMonitor {
     }
 
     const now = this.now();
+    const backoffUntil = this.#activeBackoff(now);
+    if (backoffUntil) {
+      this.#publish({
+        mode: 'rate-limited',
+        title: 'Fireflies: пауза после ограничения API',
+        detail: `Возобновлю проверку не раньше ${formatMeetingDate(backoffUntil, config.timeZone)}`,
+        lastCheckedAt: now.toISOString(),
+      });
+      return;
+    }
+
     this.#publish({ mode: 'checking', title: 'Fireflies: проверка', detail: 'Ищу начинающиеся Teams-встречи…' });
     try {
       await this.#processVerifications(config, now);
+      if (this.#activeBackoff(now)) {
+        // A verification call just tripped the rate limit — don't also try sending
+        // new bots in the same tick, it would just fail the same way.
+        this.#saveState();
+        this.#publish({ mode: 'rate-limited', title: 'Fireflies: пауза после ограничения API', detail: `Возобновлю проверку не раньше ${formatMeetingDate(this.data.rateLimitedUntil, config.timeZone)}`, lastCheckedAt: now.toISOString() });
+        return;
+      }
       const leadMinutes = clampInteger(config.firefliesJoinLeadMinutes, 0, 10, 1);
       const pollSeconds = clampInteger(config.firefliesPollSeconds, 30, 600, 60);
       const start = new Date(now.getTime() - 2 * 60 * 1000);
@@ -364,7 +461,17 @@ class FirefliesMonitor {
         }
         const title = buildMeetingTitle(event, config.timeZone);
         const durationMinutes = Math.max(1, Math.round((new Date(event.end) - eventStart) / 60_000));
-        await this.api.addToLiveMeeting(config.firefliesApiKey, { link, title, durationMinutes });
+        try {
+          await this.api.addToLiveMeeting(config.firefliesApiKey, { link, title, durationMinutes });
+        } catch (error) {
+          if (this.#handleRateLimit(error, now)) {
+            this.#log('warning', `Fireflies ограничил частоту запросов — отправка «${title}» будет повторена не раньше ${formatMeetingDate(this.data.rateLimitedUntil, config.timeZone)}.`);
+            break; // stop trying more meetings this tick, it would just fail the same way
+          }
+          this.#log('error', `Не удалось отправить бота на встречу «${title}»: ${error.message}`);
+          continue; // isolate this meeting's failure — keep processing the rest of the batch
+        }
+        this.#clearRateLimit();
         this.data.processed[key] = { title, start: event.start, sentAt: now.toISOString(), status: 'sent' };
         this.data.pending.push({
           key,
@@ -379,13 +486,23 @@ class FirefliesMonitor {
         this.#log('success', `Бот Fireflies отправлен на встречу «${title}».`);
       }
       this.#saveState();
-      this.#publish({
+      const rateLimitedNow = this.#activeBackoff(now);
+      this.#publish(rateLimitedNow ? {
+        mode: 'rate-limited',
+        title: 'Fireflies: пауза после ограничения API',
+        detail: `Возобновлю проверку не раньше ${formatMeetingDate(rateLimitedNow, config.timeZone)}`,
+        lastCheckedAt: now.toISOString(),
+      } : {
         mode: 'running',
         title: 'Fireflies работает',
         detail: `Проверено Teams-встреч: ${unique.size}`,
         lastCheckedAt: now.toISOString(),
       });
     } catch (error) {
+      if (this.#handleRateLimit(error, now)) {
+        this.#publish({ mode: 'rate-limited', title: 'Fireflies: пауза после ограничения API', detail: `Возобновлю проверку не раньше ${formatMeetingDate(this.data.rateLimitedUntil, config.timeZone)}`, lastCheckedAt: now.toISOString() });
+        return;
+      }
       this.#log('error', error?.message || String(error));
       this.#publish({ mode: 'error', title: 'Ошибка Fireflies', detail: error?.message || String(error), lastCheckedAt: now.toISOString() });
     }
@@ -397,8 +514,11 @@ module.exports = {
   FirefliesMonitor,
   buildMeetingTitle,
   cleanMeetingLink,
+  computeBackoffUntil,
   extractMeetingLink,
   firefliesErrorMessage,
+  isRateLimitError,
   meetingKey,
   normalizeStoredMeetingKey,
+  parseRetryAfter,
 };
