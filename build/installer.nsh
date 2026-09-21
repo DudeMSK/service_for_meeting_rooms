@@ -9,7 +9,6 @@ Var EwsUsernameField
 Var EwsPasswordField
 Var EwsServerField
 Var EwsMailboxesField
-Var EwsTokenField
 Var EwsFirefliesKeyField
 
 Var EwsEmailValue
@@ -17,7 +16,6 @@ Var EwsUsernameValue
 Var EwsPasswordValue
 Var EwsServerValue
 Var EwsMailboxesValue
-Var EwsTokenValue
 Var EwsFirefliesKeyValue
 Var EwsPageShown
 
@@ -75,14 +73,9 @@ Var EwsPageShown
     ${NSD_CreateText} 0 73u 100% 12u ""
     Pop $EwsMailboxesField
 
-    ${NSD_CreateLabel} 0 89u 100% 8u "Токен GitHub для автообновления (необязательно)"
+    ${NSD_CreateLabel} 0 89u 100% 8u "API-ключ Fireflies для автопротоколирования (необязательно)"
     Pop $0
     ${NSD_CreatePassword} 0 98u 100% 12u ""
-    Pop $EwsTokenField
-
-    ${NSD_CreateLabel} 0 114u 100% 8u "API-ключ Fireflies для автопротоколирования (необязательно)"
-    Pop $0
-    ${NSD_CreatePassword} 0 123u 100% 12u ""
     Pop $EwsFirefliesKeyField
 
     StrCpy $EwsPageShown "1"
@@ -95,7 +88,6 @@ Var EwsPageShown
     ${NSD_GetText} $EwsPasswordField $EwsPasswordValue
     ${NSD_GetText} $EwsServerField $EwsServerValue
     ${NSD_GetText} $EwsMailboxesField $EwsMailboxesValue
-    ${NSD_GetText} $EwsTokenField $EwsTokenValue
     ${NSD_GetText} $EwsFirefliesKeyField $EwsFirefliesKeyValue
   FunctionEnd
 !macroend
@@ -113,24 +105,14 @@ Var EwsPageShown
       FileWrite $9 "EWS_SERVER=$EwsServerValue$\r$\n"
       FileWrite $9 "EWS_AUTH=ntlm$\r$\n"
       FileWrite $9 "EWS_MAILBOXES=$EwsMailboxesValue$\r$\n"
-      ${If} $EwsTokenValue != ""
-      ${AndIf} $EwsTokenValue != "error"
-        FileWrite $9 "GH_TOKEN=$EwsTokenValue$\r$\n"
-      ${EndIf}
       ${If} $EwsFirefliesKeyValue != ""
       ${AndIf} $EwsFirefliesKeyValue != "error"
         FileWrite $9 "FIREFLIES_API_KEY=$EwsFirefliesKeyValue$\r$\n"
       ${EndIf}
       FileClose $9
     ${Else}
-      ; No EWS credentials entered — still append whichever optional secrets were
-      ; filled in, one at a time, without touching any EWS_* lines already present.
-      ${If} $EwsTokenValue != ""
-      ${AndIf} $EwsTokenValue != "error"
-        FileOpen $9 "$INSTDIR\.env" a
-        FileWrite $9 "GH_TOKEN=$EwsTokenValue$\r$\n"
-        FileClose $9
-      ${EndIf}
+      ; No EWS credentials entered — still append the Fireflies key if it was
+      ; filled in, without touching any EWS_* lines already present.
       ${If} $EwsFirefliesKeyValue != ""
       ${AndIf} $EwsFirefliesKeyValue != "error"
         FileOpen $9 "$INSTDIR\.env" a

@@ -56,17 +56,14 @@ function ensureRoomsFile(appPath, userDataPath) {
 }
 
 function configureAutoUpdater() {
-  const config = configStore.load();
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.setFeedURL({
     provider: 'github',
     owner: UPDATE_REPO_OWNER,
     repo: UPDATE_REPO_NAME,
-    private: true,
-    token: config.updateToken || undefined,
+    private: false,
   });
-  return Boolean(config.updateToken);
 }
 
 function sendUpdateStatus(status) {
@@ -74,8 +71,7 @@ function sendUpdateStatus(status) {
 }
 
 async function checkForUpdatesInBackground() {
-  const hasToken = configureAutoUpdater();
-  if (!hasToken) return;
+  configureAutoUpdater();
   try {
     await autoUpdater.checkForUpdates();
   } catch {
@@ -176,10 +172,7 @@ function registerIpc() {
   ipcMain.handle('app:version', () => app.getVersion());
 
   ipcMain.handle('update:check', async () => {
-    const hasToken = configureAutoUpdater();
-    if (!hasToken) {
-      throw new Error('Автообновление не настроено: добавьте токен GitHub (GH_TOKEN) в .env.');
-    }
+    configureAutoUpdater();
     const result = await autoUpdater.checkForUpdates();
     if (!result) {
       sendUpdateStatus({ type: 'not-packaged' });

@@ -1,6 +1,6 @@
 {
   "name": "meeting-room-calendar",
-  "version": "1.8.5",
+  "version": "1.8.7",
   "description": "Десктопное приложение для просмотра занятости переговорных комнат из Exchange (EWS)",
   "main": "src/main/index.js",
   "author": "Enremservice",
@@ -61,7 +61,7 @@
       "provider": "github",
       "owner": "DudeMSK",
       "repo": "service_for_meeting_rooms",
-      "private": true
+      "private": false
     }
   }
 }
