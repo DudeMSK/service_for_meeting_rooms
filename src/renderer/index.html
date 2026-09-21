@@ -51,25 +51,27 @@
         </div>
       </aside>
 
-      <button class="sidebar-toggle-button" id="sidebarToggleButton" type="button" aria-label="Скрыть панель" title="Скрыть панель">
-        <svg viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></svg>
-      </button>
       <div class="sidebar-resize-handle" id="sidebarResizeHandle" role="separator" aria-orientation="vertical" aria-label="Изменить ширину панели"></div>
 
       <main class="main-content">
         <header class="topbar">
-          <div class="date-navigation">
-            <button class="nav-button" id="prevButton" type="button" aria-label="Предыдущий период">
-              <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+          <div class="topbar-left">
+            <button class="sidebar-toggle-button" id="sidebarToggleButton" type="button" aria-label="Скрыть панель" title="Скрыть панель">
+              <svg viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></svg>
             </button>
-            <button class="today-button" id="todayButton" type="button">Сегодня</button>
-            <button class="nav-button" id="nextButton" type="button" aria-label="Следующий период">
-              <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
-            </button>
-            <h1 id="periodTitle">Сегодня</h1>
+            <div class="date-navigation">
+              <button class="nav-button" id="prevButton" type="button" aria-label="Предыдущий период">
+                <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+              </button>
+              <button class="today-button" id="todayButton" type="button">Сегодня</button>
+              <button class="nav-button" id="nextButton" type="button" aria-label="Следующий период">
+                <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+              <h1 id="periodTitle">Сегодня</h1>
+            </div>
+            <h1 class="mode-title" id="occupancyTitle">Занятость переговорных сейчас</h1>
+            <h1 class="mode-title" id="firefliesModeTitle">Автопротоколирование Fireflies</h1>
           </div>
-          <h1 class="mode-title" id="occupancyTitle">Занятость переговорных сейчас</h1>
-          <h1 class="mode-title" id="firefliesModeTitle">Автопротоколирование Fireflies</h1>
           <div class="topbar-actions">
             <div class="view-switcher" role="tablist" aria-label="Масштаб календаря">
               <button class="view-button active" data-view="day" type="button">День</button>
