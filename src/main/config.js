@@ -74,7 +74,7 @@ function normalizeSettings(input = {}) {
     sidebarAccent,
     updateToken: String(input.updateToken || ''),
     firefliesEnabled: normalizeBoolean(input.firefliesEnabled, DEFAULTS.firefliesEnabled),
-    firefliesApiKey: String(input.firefliesApiKey || ''),
+    firefliesApiKey: String(input.firefliesApiKey || '').trim(),
     firefliesPollSeconds: clampInteger(input.firefliesPollSeconds, 30, 600, DEFAULTS.firefliesPollSeconds),
     firefliesJoinLeadMinutes: clampInteger(input.firefliesJoinLeadMinutes, 0, 10, DEFAULTS.firefliesJoinLeadMinutes),
     firefliesVerifyDelayMinutes: clampInteger(input.firefliesVerifyDelayMinutes, 1, 60, DEFAULTS.firefliesVerifyDelayMinutes),

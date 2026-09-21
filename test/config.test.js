@@ -230,6 +230,11 @@ test('Fireflies API key is encrypted and only its presence is exposed publicly',
   }
 });
 
+test('normalizeSettings trims whitespace/newlines from the Fireflies API key', () => {
+  const config = normalizeSettings({ firefliesApiKey: '  abc123\n' });
+  assert.equal(config.firefliesApiKey, 'abc123');
+});
+
 test('legacy bridge migration imports a missing Exchange setup, API key and processed state', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'meeting-room-config-'));
   const appPath = path.join(root, 'app');
