@@ -51,6 +51,11 @@
         </div>
       </aside>
 
+      <button class="sidebar-toggle-button" id="sidebarToggleButton" type="button" aria-label="Скрыть панель" title="Скрыть панель">
+        <svg viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></svg>
+      </button>
+      <div class="sidebar-resize-handle" id="sidebarResizeHandle" role="separator" aria-orientation="vertical" aria-label="Изменить ширину панели"></div>
+
       <main class="main-content">
         <header class="topbar">
           <div class="date-navigation">
@@ -85,20 +90,8 @@
             <div class="form-grid fireflies-form-grid">
               <label class="wide checkbox-field"><input name="firefliesEnabled" type="checkbox" /><span>Включить автоматическое подключение Fireflies</span></label>
               <label class="wide"><span>API-ключ Fireflies</span><input name="firefliesApiKey" type="password" autocomplete="off" placeholder="Оставьте пустым, чтобы сохранить текущий ключ" /><small id="firefliesKeyHint">Ключ хранится в защищённом хранилище Windows и не показывается в интерфейсе.</small></label>
-              <label><span>Опрос календарей, секунд</span><input name="firefliesPollSeconds" type="number" min="30" max="600" value="60" required /></label>
-              <label><span>Подключать за, минут</span><input name="firefliesJoinLeadMinutes" type="number" min="0" max="10" value="1" required /></label>
-              <label><span>Первая проверка записи через, минут</span><input name="firefliesVerifyDelayMinutes" type="number" min="1" max="60" value="5" required /></label>
-              <label><span>Количество проверок записи</span><input name="firefliesVerifyMaxAttempts" type="number" min="1" max="10" value="3" required /></label>
-              <label><span>Повторная проверка через, минут</span><input name="firefliesVerifyRetryMinutes" type="number" min="1" max="60" value="5" required /></label>
             </div>
           </form>
-          <div class="fireflies-mode-actions">
-            <button class="secondary-button" id="firefliesTestButton" type="button">Проверить API</button>
-            <button class="secondary-button" id="firefliesRunButton" type="button">Проверить встречи сейчас</button>
-            <div class="actions-spacer"></div>
-            <button class="primary-button" id="firefliesSaveButton" type="button">Сохранить</button>
-          </div>
-          <div class="test-result" id="firefliesTestResult" hidden></div>
           <div class="fireflies-dashboard">
             <div class="fireflies-dashboard-header">
               <div><strong id="firefliesStatusTitle">Fireflies</strong><small id="firefliesStatusDetail">Состояние загружается…</small></div>
@@ -121,6 +114,7 @@
         <div class="settings-tabs" role="tablist" aria-label="Разделы настроек">
           <button class="settings-tab active" data-tab="general" type="button" role="tab" aria-selected="true">Общие</button>
           <button class="settings-tab" data-tab="appearance" type="button" role="tab" aria-selected="false">Внешний вид</button>
+          <button class="settings-tab" data-tab="fireflies" type="button" role="tab" aria-selected="false">Fireflies</button>
         </div>
         <div class="settings-tab-panel" data-tab-panel="general">
           <div class="form-grid">
@@ -148,6 +142,23 @@
             <label><span>Панель переговорных комнат — тема</span><select name="sidebarTheme"><option value="match-main">Как календарь</option><option value="dark">Темная</option><option value="light">Светлая</option></select></label>
             <label><span>Панель переговорных комнат — цвет</span><select name="sidebarAccent"><option value="green">Зеленый</option><option value="blue">Синий</option><option value="violet">Фиолетовый</option><option value="orange">Оранжевый</option></select></label>
           </div>
+        </div>
+        <div class="settings-tab-panel" data-tab-panel="fireflies" hidden>
+          <div class="form-grid">
+            <label class="wide"><span>Названия встреч, к которым можно подключать бота (по одной фразе на строке)</span><textarea form="firefliesForm" name="firefliesAllowedSubjects" rows="4" placeholder="Акт приема-передачи&#10;Приход денег"></textarea><small>Бот подключится, только если название встречи содержит хотя бы одну из этих фраз (регистр не важен). Если список пуст — бот не подключается ни к одной встрече.</small></label>
+            <label><span>Опрос календарей, секунд</span><input form="firefliesForm" name="firefliesPollSeconds" type="number" min="30" max="600" value="60" required /></label>
+            <label><span>Подключать за, минут</span><input form="firefliesForm" name="firefliesJoinLeadMinutes" type="number" min="0" max="10" value="1" required /></label>
+            <label><span>Первая проверка записи через, минут</span><input form="firefliesForm" name="firefliesVerifyDelayMinutes" type="number" min="1" max="60" value="5" required /></label>
+            <label><span>Количество проверок записи</span><input form="firefliesForm" name="firefliesVerifyMaxAttempts" type="number" min="1" max="10" value="3" required /></label>
+            <label><span>Повторная проверка через, минут</span><input form="firefliesForm" name="firefliesVerifyRetryMinutes" type="number" min="1" max="60" value="5" required /></label>
+          </div>
+          <div class="fireflies-mode-actions">
+            <button class="secondary-button" id="firefliesTestButton" type="button">Проверить API</button>
+            <button class="secondary-button" id="firefliesRunButton" type="button">Проверить встречи сейчас</button>
+            <div class="actions-spacer"></div>
+            <button class="primary-button" id="firefliesSaveButton" type="button">Сохранить</button>
+          </div>
+          <div class="test-result" id="firefliesTestResult" hidden></div>
         </div>
         <div class="modal-actions">
           <div class="actions-spacer"></div>

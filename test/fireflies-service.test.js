@@ -14,6 +14,7 @@ const {
   meetingKey,
   normalizeStoredMeetingKey,
   parseRetryAfter,
+  subjectMatchesAllowlist,
 } = require('../src/main/fireflies-service');
 
 test('extractMeetingLink supports corporate and personal Teams URLs in body and HTML entities', () => {
@@ -69,6 +70,7 @@ test('monitor dispatches one deduplicated meeting and persists verification stat
     firefliesVerifyDelayMinutes: 5,
     firefliesVerifyMaxAttempts: 3,
     firefliesVerifyRetryMinutes: 5,
+    firefliesAllowedSubjects: ['Планёрка'],
     timeZone: 'Europe/Moscow',
   };
   const event = {
@@ -150,6 +152,7 @@ test('monitor enters rate-limit backoff after a failed send, skips the rest of t
     firefliesVerifyDelayMinutes: 5,
     firefliesVerifyMaxAttempts: 3,
     firefliesVerifyRetryMinutes: 5,
+    firefliesAllowedSubjects: ['Планёрка', 'Совещание'],
     timeZone: 'Europe/Moscow',
   };
   const firstEvent = {
@@ -201,6 +204,67 @@ test('monitor enters rate-limit backoff after a failed send, skips the rest of t
     const thirdStatus = await monitor.runNow();
     assert.equal(calls.length, 2, 'once the backoff window passes the monitor should try again');
     assert.equal(thirdStatus.mode, 'rate-limited');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('subjectMatchesAllowlist matches by substring, case-insensitively, and blocks everything when the list is empty', () => {
+  const allowed = ['Акт приема-передачи', 'Приход денег'];
+  assert.equal(subjectMatchesAllowlist('Согласовать АКТ ПРИЕМА-ПЕРЕДАЧИ дел - Москва', allowed), true);
+  assert.equal(subjectMatchesAllowlist('Обеспечить приход денег по проекту', allowed), true);
+  assert.equal(subjectMatchesAllowlist('Штаб продаж с расчётчиками', allowed), false);
+  assert.equal(subjectMatchesAllowlist('Приход денег', []), false);
+  assert.equal(subjectMatchesAllowlist('Приход денег', undefined), false);
+});
+
+test('monitor only dispatches meetings whose subject matches the configured allowlist', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fireflies-allowlist-'));
+  const statePath = path.join(root, 'state.json');
+  const now = new Date('2026-09-15T06:00:00.000Z');
+  const calls = [];
+  const config = {
+    firefliesEnabled: true,
+    firefliesApiKey: 'secret-key',
+    firefliesPollSeconds: 60,
+    firefliesJoinLeadMinutes: 1,
+    firefliesVerifyDelayMinutes: 5,
+    firefliesVerifyMaxAttempts: 3,
+    firefliesVerifyRetryMinutes: 5,
+    firefliesAllowedSubjects: ['Акт приема-передачи'],
+    timeZone: 'Europe/Moscow',
+  };
+  const allowedEvent = {
+    subject: 'Согласовать акт приема-передачи дел',
+    start: '2026-09-15T06:00:30.000Z',
+    end: '2026-09-15T07:00:30.000Z',
+    location: 'ЭРС Групп Москва (2 этаж)',
+    body: 'https://teams.microsoft.com/l/meetup-join/allowed',
+    cancelled: false,
+  };
+  const blockedEvent = {
+    subject: 'Штаб продаж с расчётчиками',
+    start: '2026-09-15T06:00:45.000Z',
+    end: '2026-09-15T07:00:45.000Z',
+    location: 'ЭРС Групп Москва (2 этаж)',
+    body: 'https://teams.microsoft.com/l/meetup-join/blocked',
+    cancelled: false,
+  };
+  const monitor = new FirefliesMonitor({
+    configStore: { load: () => config },
+    createEwsClient: () => ({ getBridgeEvents: async () => [blockedEvent, allowedEvent] }),
+    statePath,
+    now: () => new Date(now),
+    api: {
+      addToLiveMeeting: async (_apiKey, input) => calls.push(input),
+      hasTranscript: async () => false,
+      testConnection: async () => ({ ok: true }),
+    },
+  });
+  try {
+    await monitor.runNow();
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].link, 'https://teams.microsoft.com/l/meetup-join/allowed');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

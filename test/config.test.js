@@ -58,6 +58,17 @@ test('normalizeSettings applies Fireflies limits and boolean values', () => {
   assert.equal(config.firefliesVerifyMaxAttempts, 1);
 });
 
+test('normalizeSettings defaults firefliesAllowedSubjects when omitted and splits/trims when provided', () => {
+  const defaulted = normalizeSettings({});
+  assert.deepEqual(defaulted.firefliesAllowedSubjects, ['Акт приема-передачи', 'Приход денег']);
+
+  const fromTextarea = normalizeSettings({ firefliesAllowedSubjects: ' Акт приема-передачи \n\nПриход денег\n Акт приема-передачи ' });
+  assert.deepEqual(fromTextarea.firefliesAllowedSubjects, ['Акт приема-передачи', 'Приход денег']);
+
+  const cleared = normalizeSettings({ firefliesAllowedSubjects: '' });
+  assert.deepEqual(cleared.firefliesAllowedSubjects, []);
+});
+
 test('normalizeSettings keeps main content and sidebar appearance independent', () => {
   const config = normalizeSettings({
     mainTheme: 'light',

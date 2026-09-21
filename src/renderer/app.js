@@ -43,7 +43,13 @@ const elements = {
   firefliesStatusDetail: document.querySelector('#firefliesStatusDetail'),
   firefliesStats: document.querySelector('#firefliesStats'),
   firefliesLog: document.querySelector('#firefliesLog'),
+  sidebarToggleButton: document.querySelector('#sidebarToggleButton'),
+  sidebarResizeHandle: document.querySelector('#sidebarResizeHandle'),
 };
+
+const SIDEBAR_MIN_WIDTH = 220;
+const SIDEBAR_MAX_WIDTH = 460;
+const SIDEBAR_DEFAULT_WIDTH = 282;
 
 const state = {
   anchor: startOfDay(new Date()),
@@ -59,6 +65,8 @@ const state = {
   updateVersion: '',
   updatePercent: 0,
   updateErrorMessage: '',
+  sidebarWidth: SIDEBAR_DEFAULT_WIDTH,
+  sidebarCollapsed: false,
 };
 
 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
@@ -218,6 +226,63 @@ function applyAppearance(config = state.config) {
   document.documentElement.dataset.sidebarTheme = resolvedSidebarTheme;
   document.documentElement.dataset.sidebarThemePreference = selectedSidebarTheme;
   document.documentElement.dataset.sidebarAccent = config?.sidebarAccent || config?.accent || 'green';
+}
+
+function loadSidebarLayout() {
+  let width = SIDEBAR_DEFAULT_WIDTH;
+  let collapsed = false;
+  try {
+    const storedWidth = Number(window.localStorage.getItem('sidebarWidth'));
+    if (Number.isFinite(storedWidth) && storedWidth >= SIDEBAR_MIN_WIDTH && storedWidth <= SIDEBAR_MAX_WIDTH) width = storedWidth;
+    collapsed = window.localStorage.getItem('sidebarCollapsed') === 'true';
+  } catch {
+    // localStorage may be unavailable (e.g. disabled site data) — fall back to defaults for this session.
+  }
+  return { width, collapsed };
+}
+
+function persistSidebarLayout() {
+  try {
+    window.localStorage.setItem('sidebarWidth', String(state.sidebarWidth));
+    window.localStorage.setItem('sidebarCollapsed', String(state.sidebarCollapsed));
+  } catch {
+    // Ignore storage failures — the layout still works for the current session.
+  }
+}
+
+function applySidebarLayout() {
+  document.documentElement.style.setProperty('--sidebar-width', `${state.sidebarCollapsed ? 0 : state.sidebarWidth}px`);
+  document.documentElement.dataset.sidebarCollapsed = String(state.sidebarCollapsed);
+  const label = state.sidebarCollapsed ? 'Показать панель' : 'Скрыть панель';
+  elements.sidebarToggleButton.setAttribute('aria-label', label);
+  elements.sidebarToggleButton.title = label;
+}
+
+function toggleSidebar() {
+  state.sidebarCollapsed = !state.sidebarCollapsed;
+  applySidebarLayout();
+  persistSidebarLayout();
+}
+
+function startSidebarResize(event) {
+  if (state.sidebarCollapsed) return;
+  event.preventDefault();
+  elements.sidebarResizeHandle.classList.add('dragging');
+  document.body.style.userSelect = 'none';
+  const onMove = (moveEvent) => {
+    const width = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, moveEvent.clientX));
+    state.sidebarWidth = width;
+    document.documentElement.style.setProperty('--sidebar-width', `${width}px`);
+  };
+  const onUp = () => {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    elements.sidebarResizeHandle.classList.remove('dragging');
+    document.body.style.userSelect = '';
+    persistSidebarLayout();
+  };
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
 }
 
 function setSyncStatus(kind, title, detail) {
@@ -413,6 +478,7 @@ function populateFirefliesForm() {
   form.firefliesVerifyDelayMinutes.value = state.config?.firefliesVerifyDelayMinutes || 5;
   form.firefliesVerifyMaxAttempts.value = state.config?.firefliesVerifyMaxAttempts || 3;
   form.firefliesVerifyRetryMinutes.value = state.config?.firefliesVerifyRetryMinutes || 5;
+  form.firefliesAllowedSubjects.value = (state.config?.firefliesAllowedSubjects || []).join('\n');
   elements.firefliesTestResult.hidden = true;
 }
 
@@ -426,6 +492,7 @@ function firefliesSettingsFromForm() {
     firefliesVerifyDelayMinutes: form.firefliesVerifyDelayMinutes.value,
     firefliesVerifyMaxAttempts: form.firefliesVerifyMaxAttempts.value,
     firefliesVerifyRetryMinutes: form.firefliesVerifyRetryMinutes.value,
+    firefliesAllowedSubjects: form.firefliesAllowedSubjects.value,
   };
 }
 
@@ -686,6 +753,7 @@ function openSettings() {
   form.sidebarTheme.value = state.config?.sidebarTheme || 'dark';
   form.sidebarAccent.value = state.config?.sidebarAccent || state.config?.accent || 'green';
   elements.testResult.hidden = true;
+  populateFirefliesForm();
   switchSettingsTab('general');
   resetUpdateUi();
   api.getAppVersion().then((version) => { elements.appVersionLabel.textContent = version; });
@@ -946,6 +1014,15 @@ elements.updateRestartButton.addEventListener('click', async () => {
 elements.firefliesTestButton.addEventListener('click', testFireflies);
 elements.firefliesRunButton.addEventListener('click', runFirefliesNow);
 elements.firefliesSaveButton.addEventListener('click', saveFirefliesSettings);
+
+elements.sidebarToggleButton.addEventListener('click', toggleSidebar);
+elements.sidebarResizeHandle.addEventListener('mousedown', startSidebarResize);
+{
+  const savedLayout = loadSidebarLayout();
+  state.sidebarWidth = savedLayout.width;
+  state.sidebarCollapsed = savedLayout.collapsed;
+  applySidebarLayout();
+}
 
 document.querySelectorAll('.view-button').forEach((button) => button.addEventListener('click', () => {
   if (state.view === button.dataset.view) return;

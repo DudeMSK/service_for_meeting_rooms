@@ -17,6 +17,7 @@ const DEFAULTS = Object.freeze({
   firefliesVerifyDelayMinutes: 5,
   firefliesVerifyMaxAttempts: 3,
   firefliesVerifyRetryMinutes: 5,
+  firefliesAllowedSubjects: ['Акт приема-передачи', 'Приход денег'],
 });
 
 function normalizeBoolean(value, fallback) {
@@ -33,6 +34,11 @@ function clampInteger(value, min, max, fallback) {
 function splitMailboxes(value) {
   const input = Array.isArray(value) ? value : String(value || '').split(/[;,\n]/);
   return [...new Set(input.map((item) => String(item).trim().toLowerCase()).filter(Boolean))];
+}
+
+function splitKeywordPhrases(value) {
+  const input = Array.isArray(value) ? value : String(value || '').split(/[;\n]/);
+  return [...new Set(input.map((item) => String(item).trim()).filter(Boolean))];
 }
 
 function normalizeServer(value) {
@@ -74,6 +80,9 @@ function normalizeSettings(input = {}) {
     firefliesVerifyDelayMinutes: clampInteger(input.firefliesVerifyDelayMinutes, 1, 60, DEFAULTS.firefliesVerifyDelayMinutes),
     firefliesVerifyMaxAttempts: clampInteger(input.firefliesVerifyMaxAttempts, 1, 10, DEFAULTS.firefliesVerifyMaxAttempts),
     firefliesVerifyRetryMinutes: clampInteger(input.firefliesVerifyRetryMinutes, 1, 60, DEFAULTS.firefliesVerifyRetryMinutes),
+    firefliesAllowedSubjects: input.firefliesAllowedSubjects === undefined
+      ? DEFAULTS.firefliesAllowedSubjects
+      : splitKeywordPhrases(input.firefliesAllowedSubjects),
   };
 }
 
@@ -155,6 +164,7 @@ class ConfigStore {
       firefliesVerifyDelayMinutes: this.env.VERIFY_DELAY_MINUTES,
       firefliesVerifyMaxAttempts: this.env.VERIFY_MAX_ATTEMPTS,
       firefliesVerifyRetryMinutes: this.env.VERIFY_RETRY_MINUTES,
+      firefliesAllowedSubjects: this.env.FIREFLIES_ALLOWED_SUBJECTS,
     };
     const stored = this.#readStored();
     const merged = normalizeSettings({ ...envSettings, ...stored });
@@ -184,6 +194,7 @@ class ConfigStore {
       firefliesVerifyDelayMinutes: config.firefliesVerifyDelayMinutes,
       firefliesVerifyMaxAttempts: config.firefliesVerifyMaxAttempts,
       firefliesVerifyRetryMinutes: config.firefliesVerifyRetryMinutes,
+      firefliesAllowedSubjects: config.firefliesAllowedSubjects,
       configured: validateSettings(config).length === 0,
       hasPassword: Boolean(config.password),
       source: config.source,

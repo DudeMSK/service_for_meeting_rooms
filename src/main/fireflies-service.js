@@ -52,6 +52,12 @@ function isRateLimitError(error) {
   return RATE_LIMIT_ERROR_PATTERN.test(error?.message || '');
 }
 
+function subjectMatchesAllowlist(subject, allowedSubjects) {
+  if (!Array.isArray(allowedSubjects) || !allowedSubjects.length) return false;
+  const normalized = String(subject || '').toLowerCase();
+  return allowedSubjects.some((keyword) => normalized.includes(String(keyword).toLowerCase()));
+}
+
 function parseRetryAfter(message) {
   const match = String(message || '').match(RETRY_AFTER_PATTERN);
   if (!match) return null;
@@ -452,6 +458,7 @@ class FirefliesMonitor {
         if (this.data.processed[key]) continue;
         const eventStart = new Date(event.start);
         if (eventStart.getTime() - leadMinutes * 60 * 1000 > now.getTime()) continue;
+        if (!subjectMatchesAllowlist(event.subject, config.firefliesAllowedSubjects)) continue;
         if (this.#recentDispatchCount(now) >= LOCAL_RATE_LIMIT_COUNT) {
           if (this.lastDeferredKey !== key) {
             this.#log('warning', `Встреча «${event.subject || 'Без названия'}» ожидает лимита Fireflies (не более 3 подключений за 20 минут).`);
@@ -521,4 +528,5 @@ module.exports = {
   meetingKey,
   normalizeStoredMeetingKey,
   parseRetryAfter,
+  subjectMatchesAllowlist,
 };
