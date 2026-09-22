@@ -184,7 +184,7 @@ function registerIpc() {
   });
 
   ipcMain.handle('update:install', () => {
-    autoUpdater.quitAndInstall();
+    autoUpdater.quitAndInstall(true, true);
   });
 
   ipcMain.handle('config:get', () => ({ ...configStore.publicConfig(), roomsFilePath }));

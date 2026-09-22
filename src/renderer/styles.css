@@ -4,6 +4,7 @@
   --muted: #6f7875;
   --faint: #9ca5a2;
   --line: #e4e7e3;
+  --button-border: #a8afaa;
   --panel: #ffffff;
   --canvas: #f5f6f3;
   --green: #16745a;
@@ -67,6 +68,7 @@ html[data-main-theme="dark"] {
   --muted: #a3ada9;
   --faint: #77827e;
   --line: #303a36;
+  --button-border: #5c6b63;
   --panel: #1b2320;
   --canvas: #111714;
   --red: #e87570;
@@ -115,6 +117,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   --sidebar-faint: #778983;
   --sidebar-border: rgba(255,255,255,.07);
   --sidebar-subtle-border: rgba(255,255,255,.055);
+  --sidebar-button-border: rgba(255,255,255,.24);
   --sidebar-hover: rgba(255,255,255,.055);
   --sidebar-count-bg: rgba(255,255,255,.07);
   --sidebar-accent: #65bd99;
@@ -138,13 +141,14 @@ html[data-sidebar-theme="light"] .sidebar {
   --sidebar-faint: #7d8a85;
   --sidebar-border: #dce3df;
   --sidebar-subtle-border: #e5eae7;
+  --sidebar-button-border: #a3b0a9;
   --sidebar-hover: rgba(25,47,39,.055);
   --sidebar-count-bg: rgba(25,47,39,.075);
   --sidebar-neutral-dot: #909c98;
   --sidebar-busy-text: #b94f4b;
 }
 .mode-toggle { display: flex; flex-direction: column; gap: 6px; padding: 16px; border-bottom: 1px solid var(--sidebar-border); }
-.mode-toggle-button { width: 100%; height: 38px; padding: 0 12px; border: 1px solid var(--sidebar-subtle-border); border-radius: 8px; color: var(--sidebar-muted); background: transparent; font-size: 12px; font-weight: 620; text-align: left; cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease; }
+.mode-toggle-button { width: 100%; height: 38px; padding: 0 12px; border: 1px solid var(--sidebar-button-border); border-radius: 8px; color: var(--sidebar-muted); background: transparent; font-size: 12px; font-weight: 620; text-align: left; cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease; }
 .mode-toggle-button:hover { color: var(--sidebar-strong); background: var(--sidebar-hover); }
 .mode-toggle-button.active { color: var(--sidebar-strong); background: color-mix(in srgb, var(--sidebar-accent) 16%, transparent); border-color: color-mix(in srgb, var(--sidebar-accent) 32%, transparent); }
 .sidebar-section-title { padding: 24px 22px 12px; display: flex; align-items: center; justify-content: space-between; color: var(--sidebar-muted); font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: .12em; }
@@ -185,7 +189,7 @@ html[data-sidebar-theme="light"] .sidebar {
 .update-alert-button svg { width: 18px; height: 18px; }
 .update-alert-button.downloading svg { animation: spin 1.4s linear infinite; }
 
-.sidebar-toggle-button { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: var(--panel); cursor: pointer; }
+.sidebar-toggle-button { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--button-border); border-radius: 8px; color: var(--muted); background: var(--panel); cursor: pointer; }
 .sidebar-toggle-button:hover { color: var(--ink); background: var(--panel-alt); }
 .sidebar-toggle-button svg { width: 16px; height: 16px; transition: transform .15s ease; }
 html[data-sidebar-collapsed="true"] .sidebar-toggle-button svg { transform: rotate(180deg); }
@@ -200,13 +204,13 @@ html[data-sidebar-collapsed="true"] .sidebar-resize-handle { display: none; }
 .date-navigation, .topbar-actions { display: flex; align-items: center; }
 .date-navigation { gap: 7px; min-width: 0; }
 .date-navigation h1 { min-width: 0; margin: 0 0 0 12px; overflow: hidden; font-size: 22px; font-weight: 650; letter-spacing: -.02em; text-overflow: ellipsis; white-space: nowrap; }
-.nav-button, .refresh-button, .close-button { display: grid; place-items: center; border: 1px solid var(--line); background: var(--panel); cursor: pointer; }
+.nav-button, .refresh-button, .close-button { display: grid; place-items: center; border: 1px solid var(--button-border); background: var(--panel); cursor: pointer; }
 .nav-button { width: 34px; height: 34px; border-radius: 8px; }
 .nav-button svg { width: 17px; height: 17px; }
 .nav-button:hover, .refresh-button:hover { border-color: var(--muted); background: var(--panel-alt); }
-.today-button { height: 34px; padding: 0 13px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); font-weight: 570; cursor: pointer; }
+.today-button { height: 34px; padding: 0 13px; border: 1px solid var(--button-border); border-radius: 8px; background: var(--panel); font-weight: 570; cursor: pointer; }
 .topbar-actions { gap: 12px; }
-.view-switcher { display: flex; padding: 3px; border: 1px solid var(--line); border-radius: 9px; background: var(--control-bg); }
+.view-switcher { display: flex; padding: 3px; border: 1px solid var(--button-border); border-radius: 9px; background: var(--control-bg); }
 .view-button { height: 30px; padding: 0 13px; border: 0; border-radius: 6px; color: var(--muted); background: transparent; cursor: pointer; }
 .view-button.active { color: var(--ink); background: var(--panel); box-shadow: 0 1px 3px rgba(26, 38, 34, .1); font-weight: 620; }
 .refresh-button { width: 38px; height: 38px; border-radius: 9px; }
@@ -386,7 +390,7 @@ html[data-app-mode="fireflies"] #firefliesModeView { display: block; }
 .primary-button, .secondary-button { min-height: 36px; padding: 0 14px; border-radius: 8px; font-weight: 590; cursor: pointer; }
 .primary-button { color: white; border: 1px solid var(--green); background: var(--green); }
 .primary-button:hover { background: var(--accent-hover); }
-.secondary-button { color: var(--ink); border: 1px solid var(--line); background: var(--panel); }
+.secondary-button { color: var(--ink); border: 1px solid var(--button-border); background: var(--panel); }
 .secondary-button:hover { background: var(--control-hover); }
 button:disabled { opacity: .55; cursor: not-allowed; }
 
