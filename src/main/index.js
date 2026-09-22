@@ -100,8 +100,6 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
-    minWidth: 1040,
-    minHeight: 680,
     backgroundColor: useDarkBackground ? '#111714' : '#f5f6f3',
     show: false,
     title: 'ЭРС групп | просмотр занятости переговорных',
